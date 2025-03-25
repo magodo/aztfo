@@ -89,15 +89,19 @@ func main() {
 	_ = sdkFunctions
 
 	printMsg := func(resourceId ResourceId, method string, apiOps []APIOperation) {
-		apiOpsMsg := []string{}
+		apiOpsMsgs := []string{}
 		for _, op := range apiOps {
-			apiOpsMsg = append(apiOpsMsg, fmt.Sprintf("%s %s %s", op.Kind, op.Path, op.Version))
+			msg := fmt.Sprintf("%s %s %s", op.Kind, op.Path, op.Version)
+			if op.IsLRO {
+				msg += " (LRO)"
+			}
+			apiOpsMsgs = append(apiOpsMsgs, msg)
 		}
 		resourceName := resourceId.Name
 		if resourceId.IsDataSource {
 			resourceName += "(DS)"
 		}
-		fmt.Printf("%s - %s\n%s\n===\n", resourceName, method, strings.Join(apiOpsMsg, "\n"))
+		fmt.Printf("%s - %s\n%s\n===\n", resourceName, method, strings.Join(apiOpsMsgs, "\n"))
 	}
 
 	// For each resource method, find the reachable SDK functions, using RTA analysis.
@@ -381,6 +385,7 @@ func findTypedResource(pkg Package, f *types.Func, isDataSource bool) (ResourceI
 func findSDKFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error) {
 	sdkAnalyzers := []SDKAnalyzer{
 		NewSDKAnalyzerTrack1(),
+		NewSDKAnalyzerPandora(),
 	}
 
 	res := map[*ssa.Function]APIOperation{}

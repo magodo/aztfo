@@ -28,6 +28,7 @@ type APIOperation struct {
 	Kind    OperationKind
 	Version string
 	Path    string
+	IsLRO   bool
 }
 
 type SDKMethod struct {
@@ -50,6 +51,8 @@ type SDKAnalyzer interface {
 }
 
 // usedSDKMethods gathers all the SDK methods that the "pkgs" used.
+// It basically find all "SDK" packages imported by the "pkgs", iterate each of them, looking for
+// method calls whose receiver is defined in "SDK" packages.
 func usedSDKMethods(a SDKAnalyzer, pkgs []*packages.Package) map[SDKMethod]struct{} {
 	sdkPkgMap := map[*packages.Package]struct{}{}
 	for _, pkg := range pkgs {
@@ -128,4 +131,22 @@ func normalizeAPIPath(p string) string {
 		out = append(out, strings.ToUpper(seg))
 	}
 	return strings.Join(out, "/")
+}
+
+func isSDKFuncLRO(fdecl *ast.FuncDecl, pkg *packages.Package, lroFieldName string) bool {
+	if len(fdecl.Type.Results.List) != 0 {
+		if ident, ok := fdecl.Type.Results.List[0].Type.(*ast.Ident); ok {
+			if obj := pkg.TypesInfo.ObjectOf(ident); obj != nil {
+				if typeutils.IsUnderlyingNamedStruct(obj.Type()) {
+					t := typeutils.DereferenceR(obj.Type()).(*types.Named).Underlying().(*types.Struct)
+					if t.NumFields() > 0 {
+						if t.Field(0).Name() == lroFieldName {
+							return true
+						}
+					}
+				}
+			}
+		}
+	}
+	return false
 }

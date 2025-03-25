@@ -38,10 +38,8 @@ func (a *SDKAnalyzerTrack1) FindSDKFuncs(pkgs Packages) (map[*ssa.Function]APIOp
 	prog := pkgs[0].ssa.Prog
 	usedSdkMethods := usedSDKMethods(a, pkgs.Pkgs())
 
-	// For each used SDK methods, try to find a method in the same receiver that is named after "Preparer" (cause it contains
-	// the information we are interested in). Additionally, if the operation contains exactly one named type parameter, or the
-	// first return value is a named interface or named struct whose first field is a response, and the named type is also defined
-	// in the same package as the method.
+	// For each used SDK methods, try to find a method in the same receiver that is named after "Preparer" (as it contains
+	// the information we are interested in).
 	res := map[*ssa.Function]APIOperation{}
 	for method := range usedSdkMethods {
 		preparerMethod := method.MethodName + "Preparer"
@@ -50,10 +48,20 @@ func (a *SDKAnalyzerTrack1) FindSDKFuncs(pkgs Packages) (map[*ssa.Function]APIOp
 			continue
 		}
 
-		prepareFuncDecl, err := TypeFunc2DeclarationWithFile(method.File, f)
+		prepareMethodDecl, err := TypeFunc2DeclarationWithFile(method.File, f)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), preparerMethod)
 		}
+
+		thisMethod := typeutils.NamedTypeMethodByName(method.Recv, method.MethodName)
+		if thisMethod == nil {
+			return nil, fmt.Errorf("failed to find the function type of %s.%s", method.Recv.Obj().Id(), method.MethodName)
+		}
+		thisMethodDecl, err := TypeFunc2DeclarationWithFile(method.File, thisMethod)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), method.MethodName)
+		}
+		isLRO := isSDKFuncLRO(thisMethodDecl, method.Pkg, "FutureAPI")
 
 		// Analyze the preparer function and gather the interested information.
 		var (
@@ -62,7 +70,7 @@ func (a *SDKAnalyzerTrack1) FindSDKFuncs(pkgs Packages) (map[*ssa.Function]APIOp
 			opKind     OperationKind
 		)
 
-		ast.Inspect(prepareFuncDecl.Body, func(node ast.Node) bool {
+		ast.Inspect(prepareMethodDecl.Body, func(node ast.Node) bool {
 			switch node := node.(type) {
 			// Looking for api version
 			case *ast.DeclStmt:
@@ -140,6 +148,7 @@ func (a *SDKAnalyzerTrack1) FindSDKFuncs(pkgs Packages) (map[*ssa.Function]APIOp
 				return true
 			}
 		})
+
 		// Some API (e.g. track1 resources/resources.go) can accept the APIVersion as a parameter.
 		if apiVersion == "" {
 			apiVersion = "unknown"
@@ -164,6 +173,7 @@ func (a *SDKAnalyzerTrack1) FindSDKFuncs(pkgs Packages) (map[*ssa.Function]APIOp
 			Kind:    opKind,
 			Version: apiVersion,
 			Path:    apiPath,
+			IsLRO:   isLRO,
 		}
 	}
 
