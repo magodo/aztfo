@@ -7,15 +7,6 @@ import (
 	"strings"
 )
 
-const (
-	pkgPathAzureRMProvider                = "github.com/hashicorp/terraform-provider-azurerm"
-	pkgPathCommonSchema                   = "github.com/hashicorp/go-azure-helpers/resourcemanager"
-	pkgPathAzureRMProviderPluginSDK       = "github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
-	pkgPathAzureRMProviderSDK             = "github.com/hashicorp/terraform-provider-azurerm/internal/sdk"
-	pkgPathPluginSDKSchema                = "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	pkgPathPandoraAzureSDKResourceManager = "github.com/hashicorp/go-azure-sdk/resource-manager"
-)
-
 func main() {
 	flagDir := flag.String("chdir", ".", "Switch to a different working directory")
 	flag.Usage = func() {
