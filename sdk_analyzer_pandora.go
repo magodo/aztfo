@@ -34,7 +34,7 @@ func (a *SDKAnalyzerPandora) Name() string {
 	return "Pandora"
 }
 
-func (a *SDKAnalyzerPandora) FindSDKFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error) {
+func (a *SDKAnalyzerPandora) FindSDKAPIFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error) {
 	if len(pkgs) == 0 {
 		return nil, nil
 	}
@@ -83,7 +83,7 @@ func (a *SDKAnalyzerPandora) findSDKOperationForMethodAutoRest(method SDKMethod)
 		return nil, nil
 	}
 
-	prepareFuncDecl, err := TypeFunc2DeclarationWithPkg(method.Pkg, prepareFunc)
+	prepareFuncDecl, err := typeutils.TypeFunc2DeclarationWithPkg(method.Pkg, prepareFunc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), preparerMethod)
 	}
@@ -92,7 +92,7 @@ func (a *SDKAnalyzerPandora) findSDKOperationForMethodAutoRest(method SDKMethod)
 	if thisMethod == nil {
 		return nil, nil
 	}
-	thisMethodDecl, err := TypeFunc2DeclarationWithPkg(method.Pkg, thisMethod)
+	thisMethodDecl, err := typeutils.TypeFunc2DeclarationWithPkg(method.Pkg, thisMethod)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), method.MethodName)
 	}
@@ -168,13 +168,13 @@ func (a *SDKAnalyzerPandora) findSDKOperationForMethodAutoRest(method SDKMethod)
 						switch sel.X.(*ast.Ident).Name {
 						// Call the id.ID() to construct the api path
 						case "id":
-							apiPath, ok = apiPathFromID(method.Pkg, sel)
+							apiPath, ok = a.apiPathFromID(method.Pkg, sel)
 							// Call the fmt.Sprintf() to construct the api path
 						case "fmt":
 							// e.g. '"%s/eventhubs/"'
 							formatString, _ := strconv.Unquote(firstArgCallExpr.Args[0].(*ast.BasicLit).Value)
 							sel := firstArgCallExpr.Args[1].(*ast.CallExpr).Fun.(*ast.SelectorExpr)
-							apiPath, ok = apiPathFromID(method.Pkg, sel)
+							apiPath, ok = a.apiPathFromID(method.Pkg, sel)
 							apiPath = normalizeAPIPath(fmt.Sprintf(formatString, apiPath))
 						default:
 							panic(fmt.Sprintf("unexpected WithPath/WithPathParameters call happened at %s", method.Pkg.Fset.Position(callexpr.Pos())))
@@ -251,7 +251,7 @@ func (a *SDKAnalyzerPandora) findSDKOperationForMethodPandora(method SDKMethod) 
 		return nil, nil
 	}
 
-	sdkFuncDecl, err := TypeFunc2DeclarationWithPkg(method.Pkg, sdkFunc)
+	sdkFuncDecl, err := typeutils.TypeFunc2DeclarationWithPkg(method.Pkg, sdkFunc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), methodName)
 	}
@@ -260,7 +260,7 @@ func (a *SDKAnalyzerPandora) findSDKOperationForMethodPandora(method SDKMethod) 
 	if thisMethod == nil {
 		return nil, nil
 	}
-	thisMethodDecl, err := TypeFunc2DeclarationWithPkg(method.Pkg, thisMethod)
+	thisMethodDecl, err := typeutils.TypeFunc2DeclarationWithPkg(method.Pkg, thisMethod)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), method.MethodName)
 	}
@@ -363,13 +363,13 @@ func (a *SDKAnalyzerPandora) findSDKOperationForMethodPandora(method SDKMethod) 
 			switch sel.X.(*ast.Ident).Name {
 			// Call the id.ID() to construct the api path
 			case "id":
-				apiPath, ok = apiPathFromID(method.Pkg, sel)
+				apiPath, ok = a.apiPathFromID(method.Pkg, sel)
 				// Call the fmt.Sprintf() to construct the api path
 			case "fmt":
 				// e.g. '"%s/eventhubs/"'
 				formatString, _ := strconv.Unquote(pathCall.Args[0].(*ast.BasicLit).Value)
 				sel := pathCall.Args[1].(*ast.CallExpr).Fun.(*ast.SelectorExpr)
-				apiPath, ok = apiPathFromID(method.Pkg, sel)
+				apiPath, ok = a.apiPathFromID(method.Pkg, sel)
 				apiPath = normalizeAPIPath(fmt.Sprintf(formatString, apiPath))
 			default:
 				panic(fmt.Sprintf("unexpected Path value call happened at %s", method.Pkg.Fset.Position(pathCall.Pos())))
@@ -406,7 +406,7 @@ func (a *SDKAnalyzerPandora) PackagePattern() *regexp.Regexp {
 	return a.pattern
 }
 
-func apiPathFromID(sdkpkg *packages.Package, idSelExpr *ast.SelectorExpr) (string, bool) {
+func (a SDKAnalyzerPandora) apiPathFromID(sdkpkg *packages.Package, idSelExpr *ast.SelectorExpr) (string, bool) {
 	idObj, ok := sdkpkg.TypesInfo.Uses[idSelExpr.X.(*ast.Ident)]
 	if !ok {
 		return "", false
@@ -417,7 +417,7 @@ func apiPathFromID(sdkpkg *packages.Package, idSelExpr *ast.SelectorExpr) (strin
 		return "", false
 	}
 
-	idFuncDecl, err := TypeFunc2DeclarationWithPkg(sdkpkg, idFunc)
+	idFuncDecl, err := typeutils.TypeFunc2DeclarationWithPkg(sdkpkg, idFunc)
 	if err != nil {
 		panic(fmt.Sprintf("failed to find the declaration of %s.%s", idObj.Name(), idFunc.Name()))
 	}

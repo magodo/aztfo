@@ -1,7 +1,14 @@
 package typeutils
 
 import (
+	"fmt"
+	"go/ast"
+	"go/token"
 	"go/types"
+
+	"golang.org/x/tools/go/ast/astutil"
+	"golang.org/x/tools/go/packages"
+	"golang.org/x/tools/go/ssa"
 )
 
 // DereferenceR returns a pointer's element type; otherwise it returns
@@ -12,19 +19,6 @@ func DereferenceR(T types.Type) types.Type {
 		return DereferenceR(p.Elem())
 	}
 	return T
-}
-
-// DereferenceRElem is like DereferenceR, but it will continue to dereference the
-// element if hit an array.
-func DereferenceRElem(t types.Type) types.Type {
-	t = DereferenceR(t)
-	if arr, ok := t.(*types.Array); ok {
-		return DereferenceRElem(arr.Elem())
-	}
-	if slice, ok := t.(*types.Slice); ok {
-		return DereferenceRElem(slice.Elem())
-	}
-	return t
 }
 
 func IsUnderlyingNamedStruct(t types.Type) bool {
@@ -39,46 +33,6 @@ func IsUnderlyingNamedStruct(t types.Type) bool {
 	return true
 }
 
-func IsUnderlyingNamedInterface(t types.Type) bool {
-	t = DereferenceR(t)
-	nt, ok := t.(*types.Named)
-	if !ok {
-		return false
-	}
-	if _, ok := nt.Underlying().(*types.Interface); !ok {
-		return false
-	}
-	return true
-}
-
-func IsUnderlyingNamedStructOrInterface(t types.Type) bool {
-	return IsUnderlyingNamedInterface(t) || IsUnderlyingNamedStruct(t)
-}
-
-func IsElemUnderlyingNamedInterface(t types.Type) bool {
-	t = DereferenceR(t)
-	switch t := t.(type) {
-	case *types.Array:
-		return IsElemUnderlyingNamedInterface(t.Elem())
-	case *types.Slice:
-		return IsElemUnderlyingNamedInterface(t.Elem())
-	default:
-		return IsUnderlyingNamedInterface(t)
-	}
-}
-
-func IsElemUnderlyingNamedStructOrInterface(t types.Type) bool {
-	t = DereferenceR(t)
-	switch t := t.(type) {
-	case *types.Array:
-		return IsElemUnderlyingNamedStructOrInterface(t.Elem())
-	case *types.Slice:
-		return IsElemUnderlyingNamedStructOrInterface(t.Elem())
-	default:
-		return IsUnderlyingNamedStructOrInterface(t)
-	}
-}
-
 func NamedTypeMethodByName(t *types.Named, methodName string) *types.Func {
 	for m := range t.Methods() {
 		if m.Name() != methodName {
@@ -87,4 +41,39 @@ func NamedTypeMethodByName(t *types.Named, methodName string) *types.Func {
 		return m
 	}
 	return nil
+}
+
+func TypeFunc2DeclarationWithFile(file *ast.File, f *types.Func) (*ast.FuncDecl, error) {
+	pos := f.Pos()
+	// Lookup the function declaration from the method identifier position.
+	// The returned enclosing interval starts from the identifier node, then the function declaration node.
+	paths, _ := astutil.PathEnclosingInterval(file, pos, pos)
+	fdecl := paths[1].(*ast.FuncDecl)
+	return fdecl, nil
+}
+func TypeFunc2DeclarationWithPkg(pkg *packages.Package, f *types.Func) (*ast.FuncDecl, error) {
+	return TypeFunc2DeclarationWithPkgs([]*packages.Package{pkg}, f)
+}
+
+func TypeFunc2DeclarationWithPkgs(pkgs []*packages.Package, f *types.Func) (*ast.FuncDecl, error) {
+	_, file := FindPos(pkgs, f.Pos())
+	if file == nil {
+		return nil, fmt.Errorf("function %q doesn't belong to any file in the specified packages", f.Name())
+	}
+	return TypeFunc2DeclarationWithFile(file, f)
+}
+
+func FindPos(pkgs []*packages.Package, pos token.Pos) (*packages.Package, *ast.File) {
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Syntax {
+			if pos >= file.FileStart && pos <= file.FileEnd {
+				return pkg, file
+			}
+		}
+	}
+	return nil, nil
+}
+
+func SSAFunction(pkg *ssa.Package, funcName string) *ssa.Function {
+	return pkg.Func(funcName)
 }

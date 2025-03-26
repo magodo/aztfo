@@ -31,7 +31,7 @@ func (a *SDKAnalyzerTrack1) Name() string {
 	return "Track1"
 }
 
-func (a *SDKAnalyzerTrack1) FindSDKFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error) {
+func (a *SDKAnalyzerTrack1) FindSDKAPIFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error) {
 	if len(pkgs) == 0 {
 		return nil, nil
 	}
@@ -48,7 +48,7 @@ func (a *SDKAnalyzerTrack1) FindSDKFuncs(pkgs Packages) (map[*ssa.Function]APIOp
 			continue
 		}
 
-		prepareMethodDecl, err := TypeFunc2DeclarationWithFile(method.File, f)
+		prepareMethodDecl, err := typeutils.TypeFunc2DeclarationWithFile(method.File, f)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), preparerMethod)
 		}
@@ -57,7 +57,7 @@ func (a *SDKAnalyzerTrack1) FindSDKFuncs(pkgs Packages) (map[*ssa.Function]APIOp
 		if thisMethod == nil {
 			return nil, fmt.Errorf("failed to find the function type of %s.%s", method.Recv.Obj().Id(), method.MethodName)
 		}
-		thisMethodDecl, err := TypeFunc2DeclarationWithFile(method.File, thisMethod)
+		thisMethodDecl, err := typeutils.TypeFunc2DeclarationWithFile(method.File, thisMethod)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), method.MethodName)
 		}

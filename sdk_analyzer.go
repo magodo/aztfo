@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
+	"maps"
 	"regexp"
 	"strings"
 
@@ -46,15 +47,36 @@ type SDKAnalyzer interface {
 	// path to tell whether the package belongs to the this SDK.
 	PackagePattern() *regexp.Regexp
 
-	// FindSDKOperations looks into the "pkgs" to find all the used Go SDK functions/methods that corresponds to an API operation.
-	FindSDKFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error)
+	// FindSDKAPIFuncs looks into the "pkgs" to find all the used Go SDK functions/methods that corresponds to an API operation.
+	FindSDKAPIFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error)
+}
+
+// findSDKAPIFuncs finds the SDK API related functions defiend by the imported SDK packages from pkgs.
+// The SDK can be either the Azure Track1 SDK or hashicorp/go-azure-sdk.
+func findSDKAPIFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error) {
+	sdkAnalyzers := []SDKAnalyzer{
+		NewSDKAnalyzerTrack1(),
+		NewSDKAnalyzerPandora(),
+	}
+
+	res := map[*ssa.Function]APIOperation{}
+	for _, sdkanalyzer := range sdkAnalyzers {
+		funcs, err := sdkanalyzer.FindSDKAPIFuncs(pkgs)
+		if err != nil {
+			return nil, err
+		}
+		maps.Copy(res, funcs)
+	}
+	return res, nil
 }
 
 // usedSDKMethods gathers all the SDK methods that the "pkgs" used.
-// It basically find all "SDK" packages imported by the "pkgs", iterate each of them, looking for
+// It basically finds all "SDK" packages imported by the "pkgs", iterate each of them, looking for
 // method calls whose receiver is defined in "SDK" packages.
 func usedSDKMethods(a SDKAnalyzer, pkgs []*packages.Package) map[SDKMethod]struct{} {
 	sdkPkgMap := map[*packages.Package]struct{}{}
+
+	// Filter the imported packages to only keep the SDK packages.
 	for _, pkg := range pkgs {
 		for _, epkg := range pkg.Imports {
 			if !a.PackagePattern().MatchString(epkg.PkgPath) {
@@ -85,7 +107,7 @@ func usedSDKMethods(a SDKAnalyzer, pkgs []*packages.Package) map[SDKMethod]struc
 					return true
 				}
 				recvTypeObj := pkg.TypesInfo.Uses[recvIdent]
-				if !typeutils.IsUnderlyingNamedStructOrInterface(recvTypeObj.Type()) {
+				if !typeutils.IsUnderlyingNamedStruct(recvTypeObj.Type()) {
 					return true
 				}
 				recvType := typeutils.DereferenceR(recvTypeObj.Type()).(*types.Named)
@@ -99,7 +121,7 @@ func usedSDKMethods(a SDKAnalyzer, pkgs []*packages.Package) map[SDKMethod]struc
 					return true
 				}
 
-				pkg, file := FindPos(sdkPkgs, recvType.Obj().Pos())
+				pkg, file := typeutils.FindPos(sdkPkgs, recvType.Obj().Pos())
 				if file == nil {
 					panic(fmt.Sprintf("failed to find %q in sdk packages", recvType.Obj().Id()))
 				}
