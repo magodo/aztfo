@@ -56,7 +56,7 @@ type SDKAnalyzer interface {
 func findSDKAPIFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error) {
 	sdkAnalyzers := []SDKAnalyzer{
 		NewSDKAnalyzerTrack1(),
-		NewSDKAnalyzerPandora(),
+		NewSDKAnalyzerPandora(pkgs.Pkgs()),
 	}
 
 	res := map[*ssa.Function]APIOperation{}

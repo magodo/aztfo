@@ -17,16 +17,32 @@ import (
 
 type SDKAnalyzerPandora struct {
 	pattern *regexp.Regexp
+	commonidsPkg *packages.Package
 }
 
-func NewSDKAnalyzerPandora() *SDKAnalyzerPandora {
+func NewSDKAnalyzerPandora(pkgs []*packages.Package) *SDKAnalyzerPandora {
 	// Note that the pandora sdk is regarded as combination of the hashicorp/go-azure-sdk and hashicorp/go-azure-helpers/resourcemanager, as there are some common types
 	// defined in the latter package.
 	// Also, at this point of time, there are also embedded sdks for the pandora sdk. They'll be removed eventually.
 	p := regexp.MustCompile(`github.com/hashicorp/terraform-provider-azurerm/internal/services/\w+/sdk|github.com/hashicorp/go-azure-sdk/resource-manager|github.com/hashicorp/go-azure-helpers/resourcemanager`)
 
+	// "hashicorp/go-azure-helpers/resourcemanager/commonids" package is needed for constructing *some* resource ids, which is used later by this analyzer.
+	var commonidsPkg *packages.Package
+	out: for _, pkg := range pkgs {
+		for _, epkg := range pkg.Imports {
+			if epkg.PkgPath	== "github.com/hashicorp/go-azure-helpers/resourcemanager/commonids" {
+				commonidsPkg = epkg
+				break out
+			}
+		}
+	}
+	if commonidsPkg == nil {
+		panic("unable to find the package: github.com/hashicorp/go-azure-helpers/resourcemanager/commonids")
+	}
+
 	return &SDKAnalyzerPandora{
 		pattern: p,
+		commonidsPkg: commonidsPkg,
 	}
 }
 
@@ -417,9 +433,10 @@ func (a SDKAnalyzerPandora) apiPathFromID(sdkpkg *packages.Package, idSelExpr *a
 		return "", false
 	}
 
-	idFuncDecl, err := typeutils.TypeFunc2DeclarationWithPkg(sdkpkg, idFunc)
+	// The id.ID() can be defined either in the same sdk package, or the commonids package.
+	idFuncDecl, err := typeutils.TypeFunc2DeclarationWithPkgs([]*packages.Package{sdkpkg,a.commonidsPkg}, idFunc)
 	if err != nil {
-		panic(fmt.Sprintf("failed to find the declaration of %s.%s", idObj.Name(), idFunc.Name()))
+		panic(fmt.Sprintf("failed to find the declaration of %s.%s", idObj.Id(), idFunc.Name()))
 	}
 
 	apiPath, _ := strconv.Unquote(idFuncDecl.Body.List[0].(*ast.AssignStmt).Rhs[0].(*ast.BasicLit).Value)
