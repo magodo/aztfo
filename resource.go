@@ -97,7 +97,7 @@ func findResources(pkgs []Package) (ResourceInfos, error) {
 func findUnTypedResource(pkg Package, f *types.Func, isDataSource bool) (ResourceInfos, error) {
 	fdecl, err := typeutils.TypeFunc2DeclarationWithPkg(pkg.pkg, f)
 	if err != nil {
-		return nil, fmt.Errorf("lookup function declaration from object of %q failed: %v", f.Name(), err)
+		return nil, fmt.Errorf("lookup function declaration from object of %q failed: %v", f.Id(), err)
 	}
 
 	// Mostly this function contains only a composite literal of resource map, e.g.
@@ -165,10 +165,9 @@ func findUnTypedResource(pkg Package, f *types.Func, isDataSource bool) (Resourc
 	// Find the CRUD functions from the resource init function
 	infos := ResourceInfos{}
 	for rid, initFunc := range resourceInitFuncs {
-		// 	fmt.Printf("%v -> %s\n", rid, initFunc.Id())
 		fdecl, err := typeutils.TypeFunc2DeclarationWithPkg(pkg.pkg, initFunc)
 		if err != nil {
-			return nil, fmt.Errorf("lookup function declaration from object of %q failed: %v", initFunc.Name(), err)
+			return nil, fmt.Errorf("lookup function declaration from object of %q failed: %v", initFunc.Id(), err)
 		}
 
 		funcs := ResourceFuncs{}
@@ -220,5 +219,101 @@ func findUnTypedResource(pkg Package, f *types.Func, isDataSource bool) (Resourc
 }
 
 func findTypedResource(pkg Package, f *types.Func, isDataSource bool) (ResourceInfos, error) {
-	return nil, nil
+	fdecl, err := typeutils.TypeFunc2DeclarationWithPkg(pkg.pkg, f)
+	if err != nil {
+		return nil, fmt.Errorf("lookup function declaration from object of %q failed: %v", f.Id(), err)
+	}
+
+	// Mostly this function contains only a composite literal of resource map, e.g.
+
+	// return []sdk.Resource{
+	// 	VirtualMachineImplicitDataDiskFromSourceResource{},
+	// 	VirtualMachineRunCommandResource{},
+	// 	GalleryApplicationResource{},
+	//  ...
+	//  }
+	resourceTypes := []*types.Named{}
+	ast.Inspect(fdecl.Body, func(n ast.Node) bool {
+		complit, ok := n.(*ast.CompositeLit)
+		if !ok {
+			return true
+		}
+		at, ok := complit.Type.(*ast.ArrayType)
+		if !ok {
+			return true
+		}
+		ate, ok := at.Elt.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		ateselx, ok := ate.X.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		if ateselx.Name != "sdk" {
+			return true
+		}
+		if isDataSource {
+			if ate.Sel.Name != "DataSource" {
+				return true
+			}
+		} else {
+			if ate.Sel.Name != "Resource" {
+				return true
+			}
+		}
+
+		for _, e := range complit.Elts {
+			complit := e.(*ast.CompositeLit)
+			t := pkg.pkg.TypesInfo.ObjectOf(complit.Type.(*ast.Ident)).Type().(*types.Named)
+			resourceTypes = append(resourceTypes, t)
+		}
+
+		// TODO: Consider forms other than composite literal
+
+		return false
+	})
+
+	infos := ResourceInfos{}
+	for _, rt := range resourceTypes {
+		// Retrieve the resource type
+		resourceTypeFunc := typeutils.NamedTypeMethodByName(rt, "ResourceType")
+		resourceTypeFuncDecl, err := typeutils.TypeFunc2DeclarationWithPkg(pkg.pkg, resourceTypeFunc)
+		if err != nil {
+			return nil, fmt.Errorf("lookup function declaration from object of %q failed: %v", resourceTypeFunc.Id(), err)
+		}
+		name, _ := strconv.Unquote(resourceTypeFuncDecl.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BasicLit).Value)
+
+		// Retrieve the methods
+		prog := pkg.ssa.Prog
+		funcs := ResourceFuncs{}
+		for _, methodName := range []string{"Create", "Update", "Read", "Delete"} {
+			sel := prog.MethodSets.MethodSet(rt).Lookup(pkg.pkg.Types, methodName)
+			if sel == nil {
+				continue
+			}
+			method := prog.MethodValue(sel)
+			if method == nil {
+				continue
+			}
+			if len(method.AnonFuncs) != 1 {
+				return nil, fmt.Errorf("expect one anonymous function directly beneth %s.%s, got=%d", rt.Obj().Id(), methodName, len(method.AnonFuncs))
+			}
+			f := method.AnonFuncs[0]
+			switch methodName {
+			case "Create":
+				funcs.C = f
+			case "Update":
+				funcs.U = f
+			case "Read":
+				funcs.R = f
+			case "Delete":
+				funcs.D = f
+			}
+		}
+
+		infos[ResourceId{Name: name, IsDataSource: isDataSource}] = funcs
+	}
+
+	return infos, nil
 }
