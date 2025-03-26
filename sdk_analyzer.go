@@ -52,11 +52,19 @@ type SDKAnalyzer interface {
 }
 
 // findSDKAPIFuncs finds the SDK API related functions defiend by the imported SDK packages from pkgs.
-// The SDK can be either the Azure Track1 SDK or hashicorp/go-azure-sdk.
+// The SDK can be either the Azure Track1 SDK or Hashicorp SDK.
 func findSDKAPIFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error) {
 	sdkAnalyzers := []SDKAnalyzer{
-		NewSDKAnalyzerTrack1(),
-		NewSDKAnalyzerPandora(pkgs.Pkgs()),
+		NewSDKAnalyzerAzure(
+			regexp.MustCompile(
+				`github.com/Azure/azure-sdk-for-go/services/(preview/)?[\w-]+/mgmt|` +
+					`github.com/jackofallops/kermit/sdk/[\w-]+`,
+			),
+		),
+		NewSDKAnalyzerHashicorp(
+			regexp.MustCompile(`github.com/hashicorp/go-azure-sdk/resource-manager`),
+			pkgs.Pkgs(),
+		),
 	}
 
 	res := map[*ssa.Function]APIOperation{}

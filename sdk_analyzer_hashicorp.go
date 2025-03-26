@@ -15,42 +15,36 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-type SDKAnalyzerPandora struct {
-	pattern *regexp.Regexp
+type SDKAnalyzerHashicorp struct {
+	pattern      *regexp.Regexp
 	commonidsPkg *packages.Package
 }
 
-func NewSDKAnalyzerPandora(pkgs []*packages.Package) *SDKAnalyzerPandora {
-	// Note that the pandora sdk is regarded as combination of the hashicorp/go-azure-sdk and hashicorp/go-azure-helpers/resourcemanager, as there are some common types
-	// defined in the latter package.
-	// Also, at this point of time, there are also embedded sdks for the pandora sdk. They'll be removed eventually.
-	p := regexp.MustCompile(`github.com/hashicorp/terraform-provider-azurerm/internal/services/\w+/sdk|github.com/hashicorp/go-azure-sdk/resource-manager|github.com/hashicorp/go-azure-helpers/resourcemanager`)
-
+// NewSDKAnalyzerHashicorp builds a SDK analyzer for Hashicorp SDK.
+// The pattern specifies the regexp pattern of the SDK package path.
+func NewSDKAnalyzerHashicorp(pattern *regexp.Regexp, pkgs []*packages.Package) *SDKAnalyzerHashicorp {
 	// "hashicorp/go-azure-helpers/resourcemanager/commonids" package is needed for constructing *some* resource ids, which is used later by this analyzer.
 	var commonidsPkg *packages.Package
-	out: for _, pkg := range pkgs {
+out:
+	for _, pkg := range pkgs {
 		for _, epkg := range pkg.Imports {
-			if epkg.PkgPath	== "github.com/hashicorp/go-azure-helpers/resourcemanager/commonids" {
+			if epkg.PkgPath == "github.com/hashicorp/go-azure-helpers/resourcemanager/commonids" {
 				commonidsPkg = epkg
 				break out
 			}
 		}
 	}
-	if commonidsPkg == nil {
-		panic("unable to find the package: github.com/hashicorp/go-azure-helpers/resourcemanager/commonids")
-	}
-
-	return &SDKAnalyzerPandora{
-		pattern: p,
+	return &SDKAnalyzerHashicorp{
+		pattern:      pattern,
 		commonidsPkg: commonidsPkg,
 	}
 }
 
-func (a *SDKAnalyzerPandora) Name() string {
-	return "Pandora"
+func (a *SDKAnalyzerHashicorp) Name() string {
+	return "Hashicorp"
 }
 
-func (a *SDKAnalyzerPandora) FindSDKAPIFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error) {
+func (a *SDKAnalyzerHashicorp) FindSDKAPIFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error) {
 	if len(pkgs) == 0 {
 		return nil, nil
 	}
@@ -66,12 +60,12 @@ func (a *SDKAnalyzerPandora) FindSDKAPIFuncs(pkgs Packages) (map[*ssa.Function]A
 		if strings.HasSuffix(method.Pkg.Fset.Position(method.File.Pos()).Filename, "autorest.go") {
 			apiOp, err = a.findSDKOperationForMethodAutoRest(method)
 			if err != nil {
-				return nil, fmt.Errorf("failed to find SDK operation (as autorest) for method %s.%s: %v", method.Recv.Obj().Id(), method.MethodName, err)
+				return nil, fmt.Errorf("failed to find SDK operation (autorest) for method %s.%s: %v", method.Recv.Obj().Id(), method.MethodName, err)
 			}
 		} else {
-			apiOp, err = a.findSDKOperationForMethodPandora(method)
+			apiOp, err = a.findSDKOperationForMethodNative(method)
 			if err != nil {
-				return nil, fmt.Errorf("failed to find SDK operation (as pandora) for method %s.%s: %v", method.Recv.Obj().Id(), method.MethodName, err)
+				return nil, fmt.Errorf("failed to find SDK operation (native) for method %s.%s: %v", method.Recv.Obj().Id(), method.MethodName, err)
 			}
 		}
 		if apiOp == nil {
@@ -89,9 +83,9 @@ func (a *SDKAnalyzerPandora) FindSDKAPIFuncs(pkgs Packages) (map[*ssa.Function]A
 	return res, nil
 }
 
-// findSDKOperationForMethodAutoRest finds the autorest based method on the same receiver of the used SDK method, named after "preparerFor".
+// findSDKOperationForMethodAutoRest finds the autorest transport based method on the same receiver of the used SDK method, named after "preparerFor".
 // If not found, returns nil APIOperation.
-func (a *SDKAnalyzerPandora) findSDKOperationForMethodAutoRest(method SDKMethod) (*APIOperation, error) {
+func (a *SDKAnalyzerHashicorp) findSDKOperationForMethodAutoRest(method SDKMethod) (*APIOperation, error) {
 	preparerMethod := "preparerFor" + strings.TrimSuffix(method.MethodName, "ThenPoll")
 
 	prepareFunc := typeutils.NamedTypeMethodByName(method.Recv, preparerMethod)
@@ -247,9 +241,9 @@ func (a *SDKAnalyzerPandora) findSDKOperationForMethodAutoRest(method SDKMethod)
 	}, nil
 }
 
-// findSDKOperationForMethodPandora finds the pandora based method on the same receiver of the used SDK method.
+// findSDKOperationForMethodNative finds the native transport based method on the same receiver of the used SDK method.
 // If not found, returns nil APIOperation.
-func (a *SDKAnalyzerPandora) findSDKOperationForMethodPandora(method SDKMethod) (*APIOperation, error) {
+func (a *SDKAnalyzerHashicorp) findSDKOperationForMethodNative(method SDKMethod) (*APIOperation, error) {
 	methodName := method.MethodName
 	if strings.HasSuffix(methodName, "ThenPoll") {
 		// PUT/DELETE
@@ -418,11 +412,11 @@ func (a *SDKAnalyzerPandora) findSDKOperationForMethodPandora(method SDKMethod) 
 	}, nil
 }
 
-func (a *SDKAnalyzerPandora) PackagePattern() *regexp.Regexp {
+func (a *SDKAnalyzerHashicorp) PackagePattern() *regexp.Regexp {
 	return a.pattern
 }
 
-func (a SDKAnalyzerPandora) apiPathFromID(sdkpkg *packages.Package, idSelExpr *ast.SelectorExpr) (string, bool) {
+func (a SDKAnalyzerHashicorp) apiPathFromID(sdkpkg *packages.Package, idSelExpr *ast.SelectorExpr) (string, bool) {
 	idObj, ok := sdkpkg.TypesInfo.Uses[idSelExpr.X.(*ast.Ident)]
 	if !ok {
 		return "", false
@@ -434,7 +428,11 @@ func (a SDKAnalyzerPandora) apiPathFromID(sdkpkg *packages.Package, idSelExpr *a
 	}
 
 	// The id.ID() can be defined either in the same sdk package, or the commonids package.
-	idFuncDecl, err := typeutils.TypeFunc2DeclarationWithPkgs([]*packages.Package{sdkpkg,a.commonidsPkg}, idFunc)
+	idPkgs := []*packages.Package{sdkpkg}
+	if a.commonidsPkg != nil {
+		idPkgs = append(idPkgs, a.commonidsPkg)
+	}
+	idFuncDecl, err := typeutils.TypeFunc2DeclarationWithPkgs(idPkgs, idFunc)
 	if err != nil {
 		panic(fmt.Sprintf("failed to find the declaration of %s.%s", idObj.Id(), idFunc.Name()))
 	}
