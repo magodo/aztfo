@@ -86,7 +86,20 @@ func (a *SDKAnalyzerHashicorp) FindSDKAPIFuncs(pkgs Packages) (map[*ssa.Function
 // findSDKOperationForMethodAutoRest finds the autorest transport based method on the same receiver of the used SDK method, named after "preparerFor".
 // If not found, returns nil APIOperation.
 func (a *SDKAnalyzerHashicorp) findSDKOperationForMethodAutoRest(method SDKMethod) (*APIOperation, error) {
-	preparerMethod := "preparerFor" + strings.TrimSuffix(method.MethodName, "ThenPoll")
+	var isLRO bool
+	methodName := method.MethodName
+	if strings.HasSuffix(methodName, "ThenPoll") {
+		// PUT/DELETE
+		methodName = strings.TrimSuffix(methodName, "ThenPoll")
+		isLRO = true
+	} else if strings.HasSuffix(methodName, "CompleteMatchingPredicate") {
+		// "LIST"
+		methodName = strings.TrimSuffix(methodName, "CompleteMatchingPredicate")
+	} else if strings.HasSuffix(methodName, "Complete") {
+		// "LIST"
+		methodName = strings.TrimSuffix(methodName, "Complete")
+	}
+	preparerMethod := "preparerFor" + methodName
 
 	prepareFunc := typeutils.NamedTypeMethodByName(method.Recv, preparerMethod)
 	if prepareFunc == nil {
@@ -98,15 +111,17 @@ func (a *SDKAnalyzerHashicorp) findSDKOperationForMethodAutoRest(method SDKMetho
 		return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), preparerMethod)
 	}
 
-	thisMethod := typeutils.NamedTypeMethodByName(method.Recv, method.MethodName)
-	if thisMethod == nil {
-		return nil, nil
+	if !isLRO {
+		thisMethod := typeutils.NamedTypeMethodByName(method.Recv, method.MethodName)
+		if thisMethod == nil {
+			return nil, nil
+		}
+		thisMethodDecl, err := typeutils.TypeFunc2DeclarationWithPkg(method.Pkg, thisMethod)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), method.MethodName)
+		}
+		isLRO = isSDKFuncLRO(thisMethodDecl, method.Pkg, "Poller")
 	}
-	thisMethodDecl, err := typeutils.TypeFunc2DeclarationWithPkg(method.Pkg, thisMethod)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), method.MethodName)
-	}
-	isLRO := isSDKFuncLRO(thisMethodDecl, method.Pkg, "Poller")
 
 	// Analyze the preparer function and gather the interested information.
 	var (
@@ -244,10 +259,12 @@ func (a *SDKAnalyzerHashicorp) findSDKOperationForMethodAutoRest(method SDKMetho
 // findSDKOperationForMethodNative finds the native transport based method on the same receiver of the used SDK method.
 // If not found, returns nil APIOperation.
 func (a *SDKAnalyzerHashicorp) findSDKOperationForMethodNative(method SDKMethod) (*APIOperation, error) {
+	var isLRO bool
 	methodName := method.MethodName
 	if strings.HasSuffix(methodName, "ThenPoll") {
 		// PUT/DELETE
 		methodName = strings.TrimSuffix(methodName, "ThenPoll")
+		isLRO = true
 	} else if strings.HasSuffix(methodName, "CompleteMatchingPredicate") {
 		// "LIST"
 		methodName = strings.TrimSuffix(methodName, "CompleteMatchingPredicate")
@@ -266,15 +283,17 @@ func (a *SDKAnalyzerHashicorp) findSDKOperationForMethodNative(method SDKMethod)
 		return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), methodName)
 	}
 
-	thisMethod := typeutils.NamedTypeMethodByName(method.Recv, method.MethodName)
-	if thisMethod == nil {
-		return nil, nil
+	if !isLRO {
+		thisMethod := typeutils.NamedTypeMethodByName(method.Recv, method.MethodName)
+		if thisMethod == nil {
+			return nil, nil
+		}
+		thisMethodDecl, err := typeutils.TypeFunc2DeclarationWithPkg(method.Pkg, thisMethod)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), method.MethodName)
+		}
+		isLRO = isSDKFuncLRO(thisMethodDecl, method.Pkg, "Poller")
 	}
-	thisMethodDecl, err := typeutils.TypeFunc2DeclarationWithPkg(method.Pkg, thisMethod)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find the declaration of %s.%s", method.Recv.Obj().Id(), method.MethodName)
-	}
-	isLRO := isSDKFuncLRO(thisMethodDecl, method.Pkg, "Poller")
 
 	// Analyze the preparer function and gather the interested information.
 	var (

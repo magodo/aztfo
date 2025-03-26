@@ -2,6 +2,9 @@ package main
 
 import (
 	"go/types"
+	"maps"
+	"slices"
+	"sort"
 
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/ssa"
@@ -79,8 +82,34 @@ func CallGraph(prog *ssa.Program) *callgraph.Graph {
 	return cg
 }
 
+type APIOperationMap map[APIOperation]struct{}
+
+func (m APIOperationMap) ToList() []APIOperation {
+	l := slices.Collect(maps.Keys(m))
+	sort.Slice(l, func(i, j int) bool {
+		x, y := l[i], l[j]
+		if x.Path != y.Path {
+			return x.Path < y.Path
+		}
+		if x.Version != y.Version {
+			return x.Version < y.Version
+		}
+		if x.Kind != y.Kind {
+			return x.Kind < y.Kind
+		}
+		if x.IsLRO != y.IsLRO {
+			return x.IsLRO
+		}
+		return true
+	})
+	return l
+}
+
 func resReachSDK(graph *callgraph.Graph, resFunc *ssa.Function, sdkFuncs map[*ssa.Function]APIOperation) []APIOperation {
-	var reachableApiOps []APIOperation
+	// Using a map to unify multiple ssa functions end up to be the same APIOperation.
+	// E.g. A resource function can reach to DeleteThenPoll(), which in turns can reach to Delete(). Both corresponds to the same delete API operation.
+	// 		In this case, only this operation will be recorded as a result.
+	m := APIOperationMap{}
 	for tgtFunc, apiOp := range sdkFuncs {
 		srcNode := graph.Nodes[resFunc]
 		targetNode := graph.Nodes[tgtFunc]
@@ -88,8 +117,8 @@ func resReachSDK(graph *callgraph.Graph, resFunc *ssa.Function, sdkFuncs map[*ss
 			continue
 		}
 		if callgraph.PathSearch(srcNode, func(n *callgraph.Node) bool { return n == targetNode }) != nil {
-			reachableApiOps = append(reachableApiOps, apiOp)
+			m[apiOp] = struct{}{}
 		}
 	}
-	return reachableApiOps
+	return m.ToList()
 }
