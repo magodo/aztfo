@@ -108,7 +108,7 @@ func (m APIOperationMap) ToList() []APIOperation {
 func resReachSDK(graph *callgraph.Graph, resFunc *ssa.Function, sdkFuncs map[*ssa.Function]APIOperation) []APIOperation {
 	// Using a map to unify multiple ssa functions end up to be the same APIOperation.
 	// E.g. A resource function can reach to DeleteThenPoll(), which in turns can reach to Delete(). Both corresponds to the same delete API operation.
-	// 		In this case, only this operation will be recorded as a result.
+	//      In this case, only this operation will be recorded as a result.
 	m := APIOperationMap{}
 	for tgtFunc, apiOp := range sdkFuncs {
 		srcNode := graph.Nodes[resFunc]
