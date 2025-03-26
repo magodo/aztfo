@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"golang.org/x/tools/go/callgraph"
-	"golang.org/x/tools/go/callgraph/static"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/ssa"
 	"golang.org/x/tools/go/ssa/ssautil"
@@ -52,7 +51,7 @@ func loadPackages(dir string, patterns ...string) ([]Package, *callgraph.Graph, 
 	}
 
 	// Build callgraph
-	graph := static.CallGraph(prog)
+	graph := CallGraph(prog)
 
 	return packages, graph, nil
 }
