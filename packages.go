@@ -25,7 +25,7 @@ func (pkgs Packages) Pkgs() []*packages.Package {
 	return pkgpkgs
 }
 
-func loadPackages(dir string, patterns ...string) ([]Package, *callgraph.Graph, error) {
+func loadPackages(dir string, patterns ...string) (Packages, *callgraph.Graph, error) {
 	// Loading Go packages
 	cfg := packages.Config{Dir: dir, Mode: packages.LoadAllSyntax}
 	pkgs, err := packages.Load(&cfg, patterns...)
@@ -45,7 +45,7 @@ func loadPackages(dir string, patterns ...string) ([]Package, *callgraph.Graph, 
 		panic(fmt.Sprintf("length of ssapkgs (%d) and pkgs (%d) are not equal", len(ssapkgs), len(pkgs)))
 	}
 
-	var packages []Package
+	var packages Packages
 	for i := range ssapkgs {
 		packages = append(packages, Package{pkg: pkgs[i], ssa: ssapkgs[i]})
 	}

@@ -8,6 +8,7 @@ import (
 )
 
 func TestSDKAnalyzerAzure(t *testing.T) {
+	t.Parallel()
 	pkgs, _, err := loadPackages("./internal/testmodule/azuresdkuser", ".")
 	require.NoError(t, err)
 
