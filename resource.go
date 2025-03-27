@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"go/types"
 	"maps"
-	"regexp"
 	"strconv"
 
 	"github.com/hashicorp/go-multierror"
@@ -27,14 +26,10 @@ type ResourceId struct {
 	IsDataSource bool
 }
 
+// findResources finds terraform resource (untyped+typed) information among the specified packages.
 func findResources(pkgs []Package) (ResourceInfos, error) {
-	servicePkgPattern := regexp.MustCompile(`github.com/hashicorp/terraform-provider-azurerm/internal/services/[\w-]+`)
 	infos := ResourceInfos{}
 	for _, pkg := range pkgs {
-		if !servicePkgPattern.MatchString(pkg.pkg.PkgPath) {
-			continue
-		}
-
 		reg := pkg.pkg.Types.Scope().Lookup("Registration")
 		if reg == nil {
 			return nil, fmt.Errorf(`"Registration" not found at package %q`, pkg.pkg.PkgPath)

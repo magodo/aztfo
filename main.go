@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 )
 
@@ -34,7 +35,14 @@ Options:`)
 	}
 
 	// Find per resource information
-	resources, err := findResources(pkgs)
+	var servicePkgs Packages
+	servicePkgPattern := regexp.MustCompile(`github.com/hashicorp/terraform-provider-azurerm/internal/services/[\w-]+`)
+	for _, pkg := range pkgs {
+		if servicePkgPattern.MatchString(pkg.pkg.PkgPath) {
+			servicePkgs = append(servicePkgs, pkg)
+		}
+	}
+	resources, err := findResources(servicePkgs)
 	if err != nil {
 		log.Fatal(err)
 	}
