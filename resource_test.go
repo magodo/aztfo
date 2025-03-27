@@ -14,7 +14,7 @@ func TestFindResources(t *testing.T) {
 	infos, err := findResources(pkgs)
 	require.NoError(t, err)
 
-	require.Equal(t, 4, len(infos))
+	require.Equal(t, 5, len(infos))
 
 	{
 		info := infos[ResourceId{Name: "untyped_datasource", IsDataSource: true}]

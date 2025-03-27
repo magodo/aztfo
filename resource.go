@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
+	"log"
 	"maps"
 	"strconv"
 
@@ -90,6 +91,9 @@ func findResources(pkgs []Package) (ResourceInfos, error) {
 }
 
 func findUnTypedResource(pkg Package, f *types.Func, isDataSource bool) (ResourceInfos, error) {
+	if f == nil {
+		return nil, nil
+	}
 	fdecl, err := typeutils.TypeFunc2DeclarationWithPkg(pkg.pkg, f)
 	if err != nil {
 		return nil, fmt.Errorf("lookup function declaration from object of %q failed: %v", f.Id(), err)
@@ -214,6 +218,9 @@ func findUnTypedResource(pkg Package, f *types.Func, isDataSource bool) (Resourc
 }
 
 func findTypedResource(pkg Package, f *types.Func, isDataSource bool) (ResourceInfos, error) {
+	if f == nil {
+		return nil, nil
+	}
 	fdecl, err := typeutils.TypeFunc2DeclarationWithPkg(pkg.pkg, f)
 	if err != nil {
 		return nil, fmt.Errorf("lookup function declaration from object of %q failed: %v", f.Id(), err)
@@ -277,7 +284,17 @@ func findTypedResource(pkg Package, f *types.Func, isDataSource bool) (ResourceI
 		if err != nil {
 			return nil, fmt.Errorf("lookup function declaration from object of %q failed: %v", resourceTypeFunc.Id(), err)
 		}
-		name, _ := strconv.Unquote(resourceTypeFuncDecl.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BasicLit).Value)
+
+		var name string
+		switch res := resourceTypeFuncDecl.Body.List[0].(*ast.ReturnStmt).Results[0].(type) {
+		case *ast.BasicLit:
+			name, _ = strconv.Unquote(res.Value)
+		case *ast.Ident:
+			name = res.Obj.Decl.(*ast.ValueSpec).Values[0].(*ast.BasicLit).Value
+			name, _ = strconv.Unquote(name)
+		default:
+			panic("unreachable")
+		}
 
 		// Retrieve the methods
 		prog := pkg.ssa.Prog
@@ -292,7 +309,9 @@ func findTypedResource(pkg Package, f *types.Func, isDataSource bool) (ResourceI
 				continue
 			}
 			if len(method.AnonFuncs) != 1 {
-				return nil, fmt.Errorf("expect one anonymous function directly beneth %s.%s, got=%d", rt.Obj().Id(), methodName, len(method.AnonFuncs))
+				// return nil, fmt.Errorf("expect one anonymous function directly beneth %s.%s, got=%d", rt.Obj().Id(), methodName, len(method.AnonFuncs))
+				log.Printf("expect one anonymous function directly beneth %s.%s, got=%d\n", rt.Obj().Id(), methodName, len(method.AnonFuncs))
+				continue
 			}
 			f := method.AnonFuncs[0]
 			switch methodName {
