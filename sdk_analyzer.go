@@ -114,11 +114,12 @@ func usedSDKMethods(a SDKAnalyzer, pkgs []*packages.Package) map[SDKMethod]struc
 				if !ok {
 					return true
 				}
-				recvTypeObj := pkg.TypesInfo.Uses[recvIdent]
-				if !typeutils.IsUnderlyingNamedStruct(recvTypeObj.Type()) {
+
+				recvObj := pkg.TypesInfo.Uses[recvIdent]
+				if !typeutils.IsUnderlyingNamedStruct(recvObj.Type()) {
 					return true
 				}
-				recvType := typeutils.DereferenceR(recvTypeObj.Type()).(*types.Named)
+				recvType := typeutils.DereferenceR(recvObj.Type()).(*types.Named)
 
 				// Ensure the receiver is defined in sdk packages
 				recvTypePkg := recvType.Obj().Pkg()
@@ -131,7 +132,7 @@ func usedSDKMethods(a SDKAnalyzer, pkgs []*packages.Package) map[SDKMethod]struc
 
 				pkg, file := typeutils.FindPos(sdkPkgs, recvType.Obj().Pos())
 				if file == nil {
-					panic(fmt.Sprintf("failed to find %q in sdk packages", recvType.Obj().Id()))
+					panic(fmt.Sprintf("failed to find %q.%q in sdk packages", recvTypePkg.Path(), recvType.Obj().Id()))
 				}
 
 				m := SDKMethod{

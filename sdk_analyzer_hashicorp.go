@@ -244,7 +244,7 @@ func (a *SDKAnalyzerHashicorp) findSDKOperationForMethodAutoRest(method SDKMetho
 		diags = append(diags, "API operation kind is not found")
 	}
 	if len(diags) != 0 {
-		return nil, fmt.Errorf("SDK operation info of the %s.%s is not complete: %s", method.Recv.Obj().Id(), method.MethodName,
+		return nil, fmt.Errorf("SDK operation info of the %s.%s is not complete (defined at %s): %s", method.Recv.Obj().Id(), method.MethodName, method.Pkg.Fset.Position(prepareFunc.Pos()),
 			strings.Join(diags, ","))
 	}
 

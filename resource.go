@@ -195,15 +195,31 @@ func findUnTypedResource(pkg Package, f *types.Func, isDataSource bool) (Resourc
 				if !ok {
 					continue
 				}
+
+				ssaFunc := func(v ast.Expr) *ssa.Function {
+					switch v := v.(type) {
+					case *ast.Ident:
+						return typeutils.SSAFunction(pkg.ssa, v.Name)
+					case *ast.CallExpr:
+						// E.g. in "resourceHDInsightKafkaCluster":
+						//
+						// Update: hdinsightClusterUpdate("Kafka", resourceHDInsightKafkaClusterRead),
+						//
+						// This will then miss the Read() function call inside the Update operation, as we are only following static calls.
+						return typeutils.SSAFunction(pkg.ssa, v.Fun.(*ast.Ident).Name)
+					default:
+						panic("unreachable")
+					}
+				}
 				switch k.Name {
 				case "Create":
-					funcs.C = typeutils.SSAFunction(pkg.ssa, kv.Value.(*ast.Ident).Name)
+					funcs.C = ssaFunc(kv.Value)
 				case "Read":
-					funcs.R = typeutils.SSAFunction(pkg.ssa, kv.Value.(*ast.Ident).Name)
+					funcs.R = ssaFunc(kv.Value)
 				case "Update":
-					funcs.U = typeutils.SSAFunction(pkg.ssa, kv.Value.(*ast.Ident).Name)
+					funcs.U = ssaFunc(kv.Value)
 				case "Delete":
-					funcs.D = typeutils.SSAFunction(pkg.ssa, kv.Value.(*ast.Ident).Name)
+					funcs.D = ssaFunc(kv.Value)
 				}
 			}
 			return false

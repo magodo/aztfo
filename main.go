@@ -3,19 +3,22 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"regexp"
 	"strings"
 )
 
 func main() {
-	flagDir := flag.String("chdir", ".", "Switch to a different working directory")
+	flagDir := flag.String("chdir", ".", "terraform-provider-azurerm root directory")
+	flagDebug := flag.Bool("debug", false, "Enable debug log")
 	flag.Usage = func() {
 		fmt.Println(`Usage: aztfp [options] <packages>
 
 Arguments:
   - packages 
-	The Go package pattern (default ".")
+	The Go package pattern (default "./internal/...").
+	Note that this is fixed in most of the time as it is a whole program analysis.
 
 Options:`)
 		flag.PrintDefaults()
@@ -24,9 +27,13 @@ Options:`)
 
 	var patterns []string
 	if len(flag.Args()) == 0 {
-		patterns = append(patterns, ".")
+		patterns = append(patterns, "./internal/...")
 	} else {
 		patterns = append(patterns, flag.Args()...)
+	}
+
+	if !*flagDebug {
+		log.SetOutput(io.Discard)
 	}
 
 	pkgs, graph, err := loadPackages(*flagDir, patterns...)
@@ -36,7 +43,7 @@ Options:`)
 
 	// Find per resource information
 	var servicePkgs Packages
-	servicePkgPattern := regexp.MustCompile(`github.com/hashicorp/terraform-provider-azurerm/internal/services/[\w-]+`)
+	servicePkgPattern := regexp.MustCompile(`^github.com/hashicorp/terraform-provider-azurerm/internal/services/[\w-]+$`)
 	for _, pkg := range pkgs {
 		if servicePkgPattern.MatchString(pkg.pkg.PkgPath) {
 			servicePkgs = append(servicePkgs, pkg)
