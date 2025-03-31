@@ -381,27 +381,30 @@ func (a *SDKAnalyzerHashicorp) findSDKOperationForMethodNative(method SDKMethod)
 				opKind = OperationKindPatch
 			}
 		case "Path":
-			pathCall, ok := exprVal.(*ast.CallExpr)
-			if !ok {
-				continue
-			}
-			sel, ok := pathCall.Fun.(*ast.SelectorExpr)
-			if !ok {
-				continue
-			}
-			switch sel.X.(*ast.Ident).Name {
-			// Call the id.ID() to construct the api path
-			case "id":
-				apiPath, ok = a.apiPathFromID(method.Pkg, sel)
-				// Call the fmt.Sprintf() to construct the api path
-			case "fmt":
-				// e.g. '"%s/eventhubs/"'
-				formatString, _ := strconv.Unquote(pathCall.Args[0].(*ast.BasicLit).Value)
-				sel := pathCall.Args[1].(*ast.CallExpr).Fun.(*ast.SelectorExpr)
-				apiPath, ok = a.apiPathFromID(method.Pkg, sel)
-				apiPath = normalizeAPIPath(fmt.Sprintf(formatString, apiPath))
+			switch val := exprVal.(type) {
+			case *ast.CallExpr:
+				sel, ok := val.Fun.(*ast.SelectorExpr)
+				if !ok {
+					continue
+				}
+				switch sel.X.(*ast.Ident).Name {
+				// Call the id.ID() to construct the api path
+				case "id":
+					apiPath, ok = a.apiPathFromID(method.Pkg, sel)
+					// Call the fmt.Sprintf() to construct the api path
+				case "fmt":
+					// e.g. '"%s/eventhubs/"'
+					formatString, _ := strconv.Unquote(val.Args[0].(*ast.BasicLit).Value)
+					sel := val.Args[1].(*ast.CallExpr).Fun.(*ast.SelectorExpr)
+					apiPath, ok = a.apiPathFromID(method.Pkg, sel)
+					apiPath = normalizeAPIPath(fmt.Sprintf(formatString, apiPath))
+				default:
+					panic(fmt.Sprintf("unexpected Path value call happened at %s", method.Pkg.Fset.Position(val.Pos())))
+				}
+			case *ast.BasicLit:
+				apiPath, _ = strconv.Unquote(val.Value)
 			default:
-				panic(fmt.Sprintf("unexpected Path value call happened at %s", method.Pkg.Fset.Position(pathCall.Pos())))
+				panic(fmt.Sprintf("unexpected Path value type at: %s", method.Pkg.Fset.Position(val.Pos())))
 			}
 		}
 	}

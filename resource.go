@@ -27,8 +27,19 @@ type ResourceId struct {
 	IsDataSource bool
 }
 
+func (id ResourceId) String() string {
+	ret := id.Name
+	if id.IsDataSource {
+		ret += " (DS)"
+	}
+	return ret
+}
+
 // findResources finds terraform resource (untyped+typed) information among the specified packages.
 func findResources(pkgs []Package) (ResourceInfos, error) {
+	log.Println("Find resources: begin")
+	defer log.Println("Find resources: end")
+
 	infos := ResourceInfos{}
 	for _, pkg := range pkgs {
 		reg := pkg.pkg.Types.Scope().Lookup("Registration")

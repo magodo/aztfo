@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
+	"log"
 	"maps"
 	"regexp"
 	"strings"
@@ -54,6 +55,9 @@ type SDKAnalyzer interface {
 // findSDKAPIFuncs finds the SDK API related functions defiend by the imported SDK packages from pkgs.
 // The SDK can be either the Azure Track1 SDK or Hashicorp SDK.
 func findSDKAPIFuncs(pkgs Packages) (map[*ssa.Function]APIOperation, error) {
+	log.Println("Find SDK API functions: begin")
+	defer log.Println("Find SDK API functions: end")
+
 	sdkAnalyzers := []SDKAnalyzer{
 		NewSDKAnalyzerAzure(
 			regexp.MustCompile(
@@ -165,15 +169,17 @@ func normalizeAPIPath(p string) string {
 }
 
 func isSDKFuncLRO(fdecl *ast.FuncDecl, pkg *packages.Package, lroFieldName string) bool {
-	if len(fdecl.Type.Results.List) != 0 {
-		if ident, ok := fdecl.Type.Results.List[0].Type.(*ast.Ident); ok {
-			if obj := pkg.TypesInfo.ObjectOf(ident); obj != nil {
-				if typeutils.IsUnderlyingNamedStruct(obj.Type()) {
-					t := typeutils.DereferenceR(obj.Type()).(*types.Named).Underlying().(*types.Struct)
-					if t.NumFields() > 0 {
-						if t.Field(0).Name() == lroFieldName {
-							return true
-						}
+	if fdecl.Type.Results == nil || len(fdecl.Type.Results.List) == 0 {
+		return false
+	}
+
+	if ident, ok := fdecl.Type.Results.List[0].Type.(*ast.Ident); ok {
+		if obj := pkg.TypesInfo.ObjectOf(ident); obj != nil {
+			if typeutils.IsUnderlyingNamedStruct(obj.Type()) {
+				t := typeutils.DereferenceR(obj.Type()).(*types.Named).Underlying().(*types.Struct)
+				if t.NumFields() > 0 {
+					if t.Field(0).Name() == lroFieldName {
+						return true
 					}
 				}
 			}

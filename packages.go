@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/packages"
@@ -26,6 +27,9 @@ func (pkgs Packages) Pkgs() []*packages.Package {
 }
 
 func loadPackages(dir string, patterns ...string) (Packages, *callgraph.Graph, error) {
+	log.Println("Load packages: begin")
+	defer log.Println("Load packages: end")
+
 	// Loading Go packages
 	cfg := packages.Config{Dir: dir, Mode: packages.LoadAllSyntax}
 	pkgs, err := packages.Load(&cfg, patterns...)

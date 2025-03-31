@@ -76,8 +76,11 @@ Options:`)
 		fmt.Printf("%s - %s\n%s\n===\n", resourceName, method, strings.Join(apiOpsMsgs, "\n"))
 	}
 
-	// For each resource method, find the reachable SDK functions, using RTA analysis.
+	// For each resource method, find the reachable SDK functions, using static analysis.
 	for resId, funcs := range resources {
+		log.Printf("Reachability check for %q: begin\n", resId)
+		defer log.Printf("Reachability check for %q: end\n", resId)
+
 		if f := funcs.R; f != nil {
 			printMsg(resId, "read", resReachSDK(graph, funcs.R, sdkFunctions))
 		}
