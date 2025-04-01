@@ -77,9 +77,11 @@ Options:`)
 	}
 
 	// For each resource method, find the reachable SDK functions, using static analysis.
+	total := len(resources)
+	n := 0
 	for resId, funcs := range resources {
-		log.Printf("Reachability check for %q: begin\n", resId)
-		defer log.Printf("Reachability check for %q: end\n", resId)
+		n += 1
+		log.Printf("[%d/%d] Reachability check for %q: begin\n", n, total, resId)
 
 		if f := funcs.R; f != nil {
 			printMsg(resId, "read", resReachSDK(graph, funcs.R, sdkFunctions))
@@ -95,5 +97,7 @@ Options:`)
 				printMsg(resId, "delete", resReachSDK(graph, funcs.D, sdkFunctions))
 			}
 		}
+
+		log.Printf("[%d/%d] Reachability check for %q: end\n", n, total, resId)
 	}
 }

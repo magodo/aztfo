@@ -331,16 +331,20 @@ func findTypedResource(pkg Package, f *types.Func, isDataSource bool) (ResourceI
 			if sel == nil {
 				continue
 			}
-			method := prog.MethodValue(sel)
-			if method == nil {
+
+			ssaf := prog.MethodValue(sel)
+			if ssaf == nil {
+				return nil, fmt.Errorf("failed to find the ssa function determined by %q", sel.String())
+			}
+
+			f, err := findTypedResourceFunc(prog, pkg, ssaf)
+			if err != nil {
+				return nil, err
+			}
+			if f == nil {
 				continue
 			}
-			if len(method.AnonFuncs) != 1 {
-				// return nil, fmt.Errorf("expect one anonymous function directly beneth %s.%s, got=%d", rt.Obj().Id(), methodName, len(method.AnonFuncs))
-				log.Printf("expect one anonymous function directly beneth %s.%s, got=%d\n", rt.Obj().Id(), methodName, len(method.AnonFuncs))
-				continue
-			}
-			f := method.AnonFuncs[0]
+
 			switch methodName {
 			case "Create":
 				funcs.C = f
@@ -357,4 +361,48 @@ func findTypedResource(pkg Package, f *types.Func, isDataSource bool) (ResourceI
 	}
 
 	return infos, nil
+}
+
+// findTypedResourceFunc finds the sdk.ResourceRunFunc defined in the sdk.ResourceFunc, as an anonymous function, that is returned by the CRUD methods.
+// If the CRUD methods indirect the call to another function, it will follow the call as long as it only contains a single return of the call.
+func findTypedResourceFunc(prog *ssa.Program, pkg Package, ssaf *ssa.Function) (*ssa.Function, error) {
+	switch len(ssaf.AnonFuncs) {
+	case 0:
+		return followTypedResourceFunc(prog, pkg, ssaf.Object().(*types.Func))
+	case 1:
+		return ssaf.AnonFuncs[0], nil
+	default:
+		return nil, fmt.Errorf("unexpected anonymous function count for %q: got=%d", ssaf.String(), len(ssaf.AnonFuncs))
+	}
+}
+
+func followTypedResourceFunc(prog *ssa.Program, pkg Package, f *types.Func) (*ssa.Function, error) {
+	fdecl, err := typeutils.TypeFunc2DeclarationWithPkg(pkg.pkg, f)
+	if err != nil {
+		return nil, fmt.Errorf("lookup function declaration from object of %q failed: %v", f.String(), err)
+	}
+	if l := len(fdecl.Body.List); l != 1 {
+		return nil, fmt.Errorf("expect resource function body to contain only one statement, got=%d", l)
+	}
+	// Here we can assume the only statement is a return statement, which has only one result, per the signature of sdk.ResourceFunc.
+	res := fdecl.Body.List[0].(*ast.ReturnStmt).Results[0]
+	callexpr, ok := res.(*ast.CallExpr)
+	if !ok {
+		return nil, fmt.Errorf("unexpected return value of reosurce function %q, expect to be a call expression", f.String())
+	}
+
+	switch fun := callexpr.Fun.(type) {
+	case *ast.SelectorExpr:
+		// Method call
+		recv := pkg.pkg.TypesInfo.TypeOf(fun.X).(*types.Named)
+		methodName := fun.Sel.Name
+		ssaFunc := prog.LookupMethod(recv, pkg.pkg.Types, methodName)
+		return findTypedResourceFunc(prog, pkg, ssaFunc)
+	case *ast.Ident:
+		// Regular function call
+		fobj := pkg.pkg.TypesInfo.ObjectOf(fun).(*types.Func)
+		return findTypedResourceFunc(prog, pkg, typeutils.SSAFunction(pkg.ssa, fobj.Name()))
+	default:
+		return nil, fmt.Errorf("unexpected returned call expression function type from %s: %T", f.String(), fun)
+	}
 }

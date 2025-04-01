@@ -44,4 +44,11 @@ func TestFindResources(t *testing.T) {
 		require.Equal(t, "(TypedResource).Update$1", info.U.RelString(pkgs[0].pkg.Types))
 		require.Equal(t, "(TypedResource).Delete$1", info.D.RelString(pkgs[0].pkg.Types))
 	}
+	{
+		info := infos[ResourceId{Name: "typed_resource_indirect", IsDataSource: false}]
+		require.Equal(t, "(TypedResourceIndirect).buildResourceFunc$1", info.C.RelString(pkgs[0].pkg.Types))
+		require.Equal(t, "buildResourceFunc$1", info.R.RelString(pkgs[0].pkg.Types))
+		require.Equal(t, "(TypedResourceIndirect).buildResourceFunc$1", info.U.RelString(pkgs[0].pkg.Types))
+		require.Equal(t, "buildResourceFunc$1", info.D.RelString(pkgs[0].pkg.Types))
+	}
 }

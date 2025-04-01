@@ -74,6 +74,10 @@ func FindPos(pkgs []*packages.Package, pos token.Pos) (*packages.Package, *ast.F
 	return nil, nil
 }
 
+func SSAMethod(prog *ssa.Program, pkg *types.Package, recv *types.Named, methodName string) *ssa.Function {
+	return prog.LookupMethod(recv, pkg, methodName)
+}
+
 func SSAFunction(pkg *ssa.Package, funcName string) *ssa.Function {
 	return pkg.Func(funcName)
 }
