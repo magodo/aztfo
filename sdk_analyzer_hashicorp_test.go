@@ -21,7 +21,7 @@ func TestSDKAnalyzerHashicorpAutoRest(t *testing.T) {
 		m[op] = struct{}{}
 	}
 	require.Equal(t,
-		[]APIOperation{
+		APIOperations{
 			{
 				Kind:    OperationKindPost,
 				Version: "2025-04-01",
@@ -46,7 +46,7 @@ func TestSDKAnalyzerHashicorpNative(t *testing.T) {
 		m[op] = struct{}{}
 	}
 	require.Equal(t,
-		[]APIOperation{
+		APIOperations{
 			{
 				Kind:    OperationKindPut,
 				Version: "2025-04-01",

@@ -21,7 +21,7 @@ func TestSDKAnalyzerAzure(t *testing.T) {
 		m[op] = struct{}{}
 	}
 	require.Equal(t,
-		[]APIOperation{
+		APIOperations{
 			{
 				Kind:    OperationKindGet,
 				Version: "2025-04-01",
