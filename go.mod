@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	github.com/hashicorp/go-multierror v1.1.1
+	github.com/magodo/workerpool v0.0.0-20240524082508-11838001bc35
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/tools v0.31.0
 )

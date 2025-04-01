@@ -113,24 +113,9 @@ func trimCallGraph(graph *callgraph.Graph, pkgPathPrefixes []string) {
 
 type APIOperationMap map[APIOperation]struct{}
 
-func (m APIOperationMap) ToList() []APIOperation {
-	l := slices.Collect(maps.Keys(m))
-	sort.Slice(l, func(i, j int) bool {
-		x, y := l[i], l[j]
-		if x.Path != y.Path {
-			return x.Path < y.Path
-		}
-		if x.Version != y.Version {
-			return x.Version < y.Version
-		}
-		if x.Kind != y.Kind {
-			return x.Kind < y.Kind
-		}
-		if x.IsLRO != y.IsLRO {
-			return x.IsLRO
-		}
-		return true
-	})
+func (m APIOperationMap) ToList() APIOperations {
+	l := APIOperations(slices.Collect(maps.Keys(m)))
+	sort.Sort(l)
 	return l
 }
 

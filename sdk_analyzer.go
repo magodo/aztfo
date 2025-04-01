@@ -26,11 +26,38 @@ const (
 	OperationKindPatch                 = "PATCH"
 )
 
+type APIOperations []APIOperation
+
+func (a APIOperations) Len() int {
+	return len(a)
+}
+
+func (a APIOperations) Less(i int, j int) bool {
+	x, y := a[i], a[j]
+	if x.Path != y.Path {
+		return x.Path < y.Path
+	}
+	if x.Version != y.Version {
+		return x.Version < y.Version
+	}
+	if x.Kind != y.Kind {
+		return x.Kind < y.Kind
+	}
+	if x.IsLRO != y.IsLRO {
+		return x.IsLRO
+	}
+	return true
+}
+
+func (a APIOperations) Swap(i int, j int) {
+	a[i], a[j] = a[j], a[i]
+}
+
 type APIOperation struct {
-	Kind    OperationKind
-	Version string
-	Path    string
-	IsLRO   bool
+	Kind    OperationKind `json:"kind"`
+	Version string        `json:"version"`
+	Path    string        `json:"path"`
+	IsLRO   bool          `json:"is_lro"`
 }
 
 type SDKMethod struct {

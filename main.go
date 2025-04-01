@@ -1,12 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"regexp"
-	"strings"
+	"runtime"
+	"sort"
+
+	"github.com/magodo/workerpool"
 )
 
 func main() {
@@ -65,44 +69,50 @@ Options:`)
 		log.Fatal(err)
 	}
 
-	printMsg := func(resourceId ResourceId, method string, apiOps []APIOperation) {
-		apiOpsMsgs := []string{}
-		for _, op := range apiOps {
-			msg := fmt.Sprintf("%s %s %s", op.Kind, op.Path, op.Version)
-			if op.IsLRO {
-				msg += " (LRO)"
-			}
-			apiOpsMsgs = append(apiOpsMsgs, msg)
-		}
-		resourceName := resourceId.Name
-		if resourceId.IsDataSource {
-			resourceName += "(DS)"
-		}
-		fmt.Printf("%s - %s\n%s\n===\n", resourceName, method, strings.Join(apiOpsMsgs, "\n"))
-	}
-
 	// For each resource method, find the reachable SDK functions, using static analysis.
-	total := len(resources)
+	var results Results
+	wp := workerpool.NewWorkPool(runtime.NumCPU())
 	n := 0
-	for resId, funcs := range resources {
+	total := len(resources)
+	wp.Run(func(res any) error {
 		n += 1
-		log.Printf("[%d/%d] Reachability check for %q: begin\n", n, total, resId)
+		result := res.(Result)
+		log.Printf("[%d/%d] Reachability check for %q done\n", n, total, result.Id)
+		results = append(results, result)
+		return nil
+	})
+	for resId, funcs := range resources {
+		wp.AddTask(func() (any, error) {
+			result := Result{Id: resId}
+			if f := funcs.R; f != nil {
+				result.Read = resReachSDK(graph, funcs.R, sdkFunctions)
+			}
+			if !resId.IsDataSource {
+				if f := funcs.C; f != nil {
+					result.Create = resReachSDK(graph, funcs.C, sdkFunctions)
+				}
+				if f := funcs.U; f != nil {
+					result.Update = resReachSDK(graph, funcs.U, sdkFunctions)
+				}
+				if f := funcs.D; f != nil {
+					result.Delete = resReachSDK(graph, funcs.D, sdkFunctions)
+				}
+			}
+			return result, nil
+		})
 
-		if f := funcs.R; f != nil {
-			printMsg(resId, "read", resReachSDK(graph, funcs.R, sdkFunctions))
-		}
-		if !resId.IsDataSource {
-			if f := funcs.C; f != nil {
-				printMsg(resId, "create", resReachSDK(graph, funcs.C, sdkFunctions))
-			}
-			if f := funcs.U; f != nil {
-				printMsg(resId, "update", resReachSDK(graph, funcs.U, sdkFunctions))
-			}
-			if f := funcs.D; f != nil {
-				printMsg(resId, "delete", resReachSDK(graph, funcs.D, sdkFunctions))
-			}
-		}
-
-		log.Printf("[%d/%d] Reachability check for %q: end\n", n, total, resId)
 	}
+
+	if err := wp.Done(); err != nil {
+		log.Fatal(err)
+	}
+
+	sort.Sort(results)
+
+	b, err := json.MarshalIndent(results, "", "  ")
+	if err != nil {
+		log.Fatalf("marshal the result: %v", err)
+	}
+
+	fmt.Println(string(b))
 }

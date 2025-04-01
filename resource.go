@@ -23,8 +23,8 @@ type ResourceFuncs struct {
 }
 
 type ResourceId struct {
-	Name         string
-	IsDataSource bool
+	Name         string `json:"name"`
+	IsDataSource bool   `json:"is_data_source"`
 }
 
 func (id ResourceId) String() string {
