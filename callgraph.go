@@ -5,6 +5,7 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strings"
 
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/ssa"
@@ -80,6 +81,34 @@ func CallGraph(prog *ssa.Program) *callgraph.Graph {
 	}
 
 	return cg
+}
+
+func trimCallGraph(graph *callgraph.Graph, pkgPathPrefixes []string) {
+	//graph.DeleteSyntheticNodes() // This takes a lot of time...
+	oldNodes := map[*ssa.Function]*callgraph.Node{}
+	maps.Copy(oldNodes, graph.Nodes)
+	for f, node := range oldNodes {
+		if f == nil {
+			continue
+		}
+		if f.Pkg == nil {
+			continue
+		}
+		pkgPath := f.Pkg.Pkg.Path()
+
+		var ok bool
+		for _, prefix := range pkgPathPrefixes {
+			if strings.HasPrefix(pkgPath, prefix) {
+				ok = true
+				break
+			}
+		}
+		if ok {
+			continue
+		}
+
+		graph.DeleteNode(node)
+	}
 }
 
 type APIOperationMap map[APIOperation]struct{}

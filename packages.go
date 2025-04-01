@@ -26,7 +26,7 @@ func (pkgs Packages) Pkgs() []*packages.Package {
 	return pkgpkgs
 }
 
-func loadPackages(dir string, patterns ...string) (Packages, *callgraph.Graph, error) {
+func loadPackages(dir string, pkgPathPrefixes []string, patterns []string) (Packages, *callgraph.Graph, error) {
 	log.Println("Load packages: begin")
 	defer log.Println("Load packages: end")
 
@@ -56,6 +56,10 @@ func loadPackages(dir string, patterns ...string) (Packages, *callgraph.Graph, e
 
 	// Build callgraph
 	graph := CallGraph(prog)
+
+	if len(pkgPathPrefixes) != 0 {
+		trimCallGraph(graph, pkgPathPrefixes)
+	}
 
 	return packages, graph, nil
 }

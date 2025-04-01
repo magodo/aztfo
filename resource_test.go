@@ -8,7 +8,7 @@ import (
 
 func TestFindResources(t *testing.T) {
 	t.Parallel()
-	pkgs, _, err := loadPackages("./internal/testmodule/resource/services/empty", ".")
+	pkgs, _, err := loadPackages("./internal/testmodule/resource/services/empty", nil, []string{"."})
 	require.NoError(t, err)
 
 	infos, err := findResources(pkgs)
