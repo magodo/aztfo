@@ -16,7 +16,8 @@ func (r Registration) SupportedDataSources() map[string]*pluginsdk.Resource {
 // SupportedResources returns the supported Resources supported by this Service
 func (r Registration) SupportedResources() map[string]*pluginsdk.Resource {
 	resources := map[string]*pluginsdk.Resource{
-		"untyped_resource": untypedResource(),
+		"untyped_resource":          untypedResource(),
+		"untyped_resource_indirect": untypedResourceIndirect(),
 	}
 	if true {
 		resources["untyped_resource2"] = untypedResource()

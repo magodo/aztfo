@@ -258,8 +258,12 @@ func findUnTypedResource(pkg Package, f *types.Func, isDataSource bool) (Resourc
 						//
 						// Update: hdinsightClusterUpdate("Kafka", resourceHDInsightKafkaClusterRead),
 						//
-						// This will then miss the Read() function call inside the Update operation, as we are only following static calls.
-						return typeutils.SSAFunction(pkg.ssa, v.Fun.(*ast.Ident).Name)
+						// Need to follow the call.
+						ff, err := findResourceFunc(pkg.ssa.Prog, pkg, typeutils.SSAFunction(pkg.ssa, v.Fun.(*ast.Ident).Name))
+						if err != nil {
+							panic(fmt.Sprintf("failed to follow untyped resource func for %q: %v", rid, err))
+						}
+						return ff
 					default:
 						panic("unreachable")
 					}
@@ -379,7 +383,7 @@ func findTypedResource(pkg Package, f *types.Func, isDataSource bool) (ResourceI
 				return nil, fmt.Errorf("failed to find the ssa function determined by %q", sel.String())
 			}
 
-			f, err := findTypedResourceFunc(prog, pkg, ssaf)
+			f, err := findResourceFunc(prog, pkg, ssaf)
 			if err != nil {
 				return nil, err
 			}
@@ -405,12 +409,21 @@ func findTypedResource(pkg Package, f *types.Func, isDataSource bool) (ResourceI
 	return infos, nil
 }
 
-// findTypedResourceFunc finds the sdk.ResourceRunFunc defined in the sdk.ResourceFunc, as an anonymous function, that is returned by the CRUD methods.
+// findResourceFunc finds the resource func for both typed and untyped resources.
+// For typed:
+// findResourceFunc finds the sdk.ResourceRunFunc defined in the sdk.ResourceFunc, as an anonymous function, that is returned by the CRUD methods.
 // If the CRUD methods indirect the call to another function, it will follow the call as long as it only contains a single return of the call.
-func findTypedResourceFunc(prog *ssa.Program, pkg Package, ssaf *ssa.Function) (*ssa.Function, error) {
+// Example: Delete() of azurerm_resource_deployment_script_azure_power_shell
+// For untyped:
+// findResourceFunc finds the pluginsdk.XXXFunc, which is most of the time a simple function.
+// If the CRUD methods indirect the call to another function, it will follow the call as long as it only contains a single return of the call.
+// Example: Update() of azurerm_hdinsight_hbase_cluster
+//
+// In both case when indirect call occurs, there will be always a single annonymous function.
+func findResourceFunc(prog *ssa.Program, pkg Package, ssaf *ssa.Function) (*ssa.Function, error) {
 	switch len(ssaf.AnonFuncs) {
 	case 0:
-		return followTypedResourceFunc(prog, pkg, ssaf.Object().(*types.Func))
+		return followResourceFunc(prog, pkg, ssaf.Object().(*types.Func))
 	case 1:
 		return ssaf.AnonFuncs[0], nil
 	default:
@@ -418,7 +431,7 @@ func findTypedResourceFunc(prog *ssa.Program, pkg Package, ssaf *ssa.Function) (
 	}
 }
 
-func followTypedResourceFunc(prog *ssa.Program, pkg Package, f *types.Func) (*ssa.Function, error) {
+func followResourceFunc(prog *ssa.Program, pkg Package, f *types.Func) (*ssa.Function, error) {
 	fdecl, err := typeutils.TypeFunc2DeclarationWithPkg(pkg.pkg, f)
 	if err != nil {
 		return nil, fmt.Errorf("lookup function declaration from object of %q failed: %v", f.String(), err)
@@ -430,7 +443,7 @@ func followTypedResourceFunc(prog *ssa.Program, pkg Package, f *types.Func) (*ss
 	res := fdecl.Body.List[0].(*ast.ReturnStmt).Results[0]
 	callexpr, ok := res.(*ast.CallExpr)
 	if !ok {
-		return nil, fmt.Errorf("unexpected return value of reosurce function %q, expect to be a call expression", f.String())
+		return nil, fmt.Errorf("unexpected return value of resource function %q, expect to be a call expression", f.String())
 	}
 
 	switch fun := callexpr.Fun.(type) {
@@ -439,11 +452,11 @@ func followTypedResourceFunc(prog *ssa.Program, pkg Package, f *types.Func) (*ss
 		recv := pkg.pkg.TypesInfo.TypeOf(fun.X).(*types.Named)
 		methodName := fun.Sel.Name
 		ssaFunc := prog.LookupMethod(recv, pkg.pkg.Types, methodName)
-		return findTypedResourceFunc(prog, pkg, ssaFunc)
+		return findResourceFunc(prog, pkg, ssaFunc)
 	case *ast.Ident:
 		// Regular function call
 		fobj := pkg.pkg.TypesInfo.ObjectOf(fun).(*types.Func)
-		return findTypedResourceFunc(prog, pkg, typeutils.SSAFunction(pkg.ssa, fobj.Name()))
+		return findResourceFunc(prog, pkg, typeutils.SSAFunction(pkg.ssa, fobj.Name()))
 	default:
 		return nil, fmt.Errorf("unexpected returned call expression function type from %s: %T", f.String(), fun)
 	}
