@@ -18,6 +18,9 @@ func (r Registration) SupportedResources() map[string]*pluginsdk.Resource {
 	resources := map[string]*pluginsdk.Resource{
 		"untyped_resource": untypedResource(),
 	}
+	if true {
+		resources["untyped_resource2"] = untypedResource()
+	}
 	return resources
 }
 

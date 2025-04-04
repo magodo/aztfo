@@ -119,13 +119,14 @@ func findUnTypedResource(pkg Package, f *types.Func, isDataSource bool) (Resourc
 		return nil, fmt.Errorf("lookup function declaration from object of %q failed: %v", f.Id(), err)
 	}
 
-	// Mostly this function contains only a composite literal of resource map, e.g.
+	resourceInitFuncs := map[ResourceId]*types.Func{}
 
+	// Mostly this function contains only a composite literal of resource map, e.g.
+	//
 	// 	resources := map[string]*pluginsdk.Resource{
 	// 		"azurerm_management_lock": resourceManagementLock(),
 	// 		"azurerm_resource_group":  resourceResourceGroup(),
 	// 	}
-	resourceInitFuncs := map[ResourceId]*types.Func{}
 	ast.Inspect(fdecl.Body, func(n ast.Node) bool {
 		complit, ok := n.(*ast.CompositeLit)
 		if !ok {
@@ -166,17 +167,49 @@ func findUnTypedResource(pkg Package, f *types.Func, isDataSource bool) (Resourc
 			name, _ := strconv.Unquote(kv.Key.(*ast.BasicLit).Value)
 			f := pkg.pkg.TypesInfo.ObjectOf(kv.Value.(*ast.CallExpr).Fun.(*ast.Ident))
 			if f == nil {
-				err = multierror.Append(err, fmt.Errorf("function object of %q not found", name))
+				err = multierror.Append(err, fmt.Errorf("registration function object of %q not found", name))
 				return false
 			}
 			resourceInitFuncs[ResourceId{Name: name, IsDataSource: isDataSource}] = f.(*types.Func)
 		}
 
-		// TODO: Consider forms other than composite literal
+		return false
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// There are also cases some resources will be conditionally registered, e.g.
+	//
+	// if !features.FivePointOh() {
+	//     resources["azurerm_maps_creator"] = resourceMapsCreator()
+	// }
+	ast.Inspect(fdecl.Body, func(n ast.Node) bool {
+		assign, ok := n.(*ast.AssignStmt)
+		if !ok {
+			return true
+		}
+		if len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
+			return true
+		}
+		idxExpr, ok := assign.Lhs[0].(*ast.IndexExpr)
+		if !ok {
+			return true
+		}
+		idx, ok := idxExpr.Index.(*ast.BasicLit)
+		if !ok {
+			return true
+		}
+		name, _ := strconv.Unquote(idx.Value)
+		f := pkg.pkg.TypesInfo.ObjectOf(assign.Rhs[0].(*ast.CallExpr).Fun.(*ast.Ident))
+		if f == nil {
+			err = multierror.Append(err, fmt.Errorf("registration function object of %q not found", name))
+			return false
+		}
+		resourceInitFuncs[ResourceId{Name: name, IsDataSource: isDataSource}] = f.(*types.Func)
 
 		return false
 	})
-
 	if err != nil {
 		return nil, err
 	}

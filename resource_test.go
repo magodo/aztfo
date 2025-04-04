@@ -14,7 +14,7 @@ func TestFindResources(t *testing.T) {
 	infos, err := findResources(pkgs)
 	require.NoError(t, err)
 
-	require.Equal(t, 6, len(infos))
+	require.Equal(t, 7, len(infos))
 
 	{
 		info := infos[ResourceId{Name: "untyped_datasource", IsDataSource: true}]
@@ -25,6 +25,13 @@ func TestFindResources(t *testing.T) {
 	}
 	{
 		info := infos[ResourceId{Name: "untyped_resource", IsDataSource: false}]
+		require.Equal(t, "untypedResourceCreate", info.C.Object().Name())
+		require.Equal(t, "untypedResourceRead", info.R.Object().Name())
+		require.Equal(t, "untypedResourceUpdate", info.U.Object().Name())
+		require.Equal(t, "untypedResourceDelete", info.D.Object().Name())
+	}
+	{
+		info := infos[ResourceId{Name: "untyped_resource2", IsDataSource: false}]
 		require.Equal(t, "untypedResourceCreate", info.C.Object().Name())
 		require.Equal(t, "untypedResourceRead", info.R.Object().Name())
 		require.Equal(t, "untypedResourceUpdate", info.U.Object().Name())
