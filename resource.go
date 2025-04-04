@@ -41,61 +41,70 @@ func findResources(pkgs []Package) (ResourceInfos, error) {
 	defer log.Println("Find resources: end")
 
 	infos := ResourceInfos{}
+
 	for _, pkg := range pkgs {
-		reg := pkg.pkg.Types.Scope().Lookup("Registration")
-		if reg == nil {
+		var regFound bool
+		for _, regName := range []string{"Registration", "autoRegistration"} {
+			reg := pkg.pkg.Types.Scope().Lookup(regName)
+			if reg == nil {
+				continue
+			}
+			regFound = true
+
+			var (
+				methodSupportedDataSources *types.Func
+				methodSupportedResources   *types.Func
+				methodDataSources          *types.Func
+				methodResources            *types.Func
+			)
+			for method := range reg.Type().(*types.Named).Methods() {
+				switch method.Name() {
+				case "SupportedDataSources":
+					methodSupportedDataSources = method
+				case "SupportedResources":
+					methodSupportedResources = method
+				case "DataSources":
+					methodDataSources = method
+				case "Resources":
+					methodResources = method
+				}
+			}
+
+			// fmt.Println(
+			// 	methodSupportedDataSources.Name(),
+			// 	methodSupportedResources.Name(),
+			// 	methodDataSources.Name(),
+			// 	methodResources.Name(),
+			// )
+
+			theInfos, err := findUnTypedResource(pkg, methodSupportedDataSources, true)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find untyped data resources: %v", err)
+			}
+			maps.Copy(infos, theInfos)
+
+			theInfos, err = findUnTypedResource(pkg, methodSupportedResources, false)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find untyped resources: %v", err)
+			}
+			maps.Copy(infos, theInfos)
+
+			theInfos, err = findTypedResource(pkg, methodDataSources, true)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find typed data resources: %v", err)
+			}
+			maps.Copy(infos, theInfos)
+
+			theInfos, err = findTypedResource(pkg, methodResources, false)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find typed resources: %v", err)
+			}
+			maps.Copy(infos, theInfos)
+		}
+
+		if !regFound {
 			return nil, fmt.Errorf(`"Registration" not found at package %q`, pkg.pkg.PkgPath)
 		}
-
-		var (
-			methodSupportedDataSources *types.Func
-			methodSupportedResources   *types.Func
-			methodDataSources          *types.Func
-			methodResources            *types.Func
-		)
-		for method := range reg.Type().(*types.Named).Methods() {
-			switch method.Name() {
-			case "SupportedDataSources":
-				methodSupportedDataSources = method
-			case "SupportedResources":
-				methodSupportedResources = method
-			case "DataSources":
-				methodDataSources = method
-			case "Resources":
-				methodResources = method
-			}
-		}
-
-		// fmt.Println(
-		// 	methodSupportedDataSources.Name(),
-		// 	methodSupportedResources.Name(),
-		// 	methodDataSources.Name(),
-		// 	methodResources.Name(),
-		// )
-
-		theInfos, err := findUnTypedResource(pkg, methodSupportedDataSources, true)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find untyped data resources: %v", err)
-		}
-		maps.Copy(infos, theInfos)
-
-		theInfos, err = findUnTypedResource(pkg, methodSupportedResources, false)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find untyped resources: %v", err)
-		}
-		maps.Copy(infos, theInfos)
-
-		theInfos, err = findTypedResource(pkg, methodDataSources, true)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find typed data resources: %v", err)
-		}
-		maps.Copy(infos, theInfos)
-
-		theInfos, err = findTypedResource(pkg, methodResources, false)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find typed resources: %v", err)
-		}
-		maps.Copy(infos, theInfos)
 	}
 
 	return infos, nil
