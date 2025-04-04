@@ -1,6 +1,6 @@
 package empty
 
-import "github.com/magodo/aztfp/internal/testmodule/resource/pluginsdk"
+import "github.com/magodo/aztfo/internal/testmodule/resource/pluginsdk"
 
 func untypedDataSource() *pluginsdk.Resource {
 	return &pluginsdk.Resource{

@@ -1,4 +1,4 @@
-module github.com/magodo/aztfp/internal/testmodule
+module github.com/magodo/aztfo/internal/testmodule
 
 go 1.24.1
 

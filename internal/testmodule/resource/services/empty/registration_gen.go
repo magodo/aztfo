@@ -1,7 +1,7 @@
 package empty
 
 import (
-	"github.com/magodo/aztfp/internal/testmodule/resource/sdk"
+	"github.com/magodo/aztfo/internal/testmodule/resource/sdk"
 )
 
 type autoRegistration struct{}

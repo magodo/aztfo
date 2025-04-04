@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/magodo/aztfp/internal/testmodule/hashicorpsdk"
+	"github.com/magodo/aztfo/internal/testmodule/hashicorpsdk"
 )
 
 func main() {

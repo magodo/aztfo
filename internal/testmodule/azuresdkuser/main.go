@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/magodo/aztfp/internal/testmodule/azuresdk"
+	"github.com/magodo/aztfo/internal/testmodule/azuresdk"
 )
 
 func main() {

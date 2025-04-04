@@ -12,7 +12,7 @@ func TestSDKAnalyzerAzure(t *testing.T) {
 	pkgs, _, err := loadPackages("./internal/testmodule/azuresdkuser", nil, []string{"."})
 	require.NoError(t, err)
 
-	a := NewSDKAnalyzerAzure(regexp.MustCompile(`github.com/magodo/aztfp/internal/testmodule/azuresdk`))
+	a := NewSDKAnalyzerAzure(regexp.MustCompile(`github.com/magodo/aztfo/internal/testmodule/azuresdk`))
 	funcs, err := a.FindSDKAPIFuncs(pkgs)
 	require.NoError(t, err)
 

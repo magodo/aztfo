@@ -17,7 +17,7 @@ func main() {
 	flagDir := flag.String("chdir", ".", "terraform-provider-azurerm root directory")
 	flagDebug := flag.Bool("debug", false, "Enable debug log")
 	flag.Usage = func() {
-		fmt.Println(`Usage: aztfp [options] <packages>
+		fmt.Println(`Usage: aztfo [options] <packages>
 
 Arguments:
   - packages 

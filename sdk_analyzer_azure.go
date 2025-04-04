@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/magodo/aztfp/typeutils"
+	"github.com/magodo/aztfo/typeutils"
 	"golang.org/x/tools/go/ssa"
 )
 

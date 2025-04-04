@@ -12,7 +12,7 @@ func TestSDKAnalyzerHashicorpAutoRest(t *testing.T) {
 	pkgs, _, err := loadPackages("./internal/testmodule/hashicorpsdkuser/autorest", nil, []string{"."})
 	require.NoError(t, err)
 
-	a := NewSDKAnalyzerHashicorp(regexp.MustCompile(`github.com/magodo/aztfp/internal/testmodule/hashicorpsdk`), pkgs.Pkgs())
+	a := NewSDKAnalyzerHashicorp(regexp.MustCompile(`github.com/magodo/aztfo/internal/testmodule/hashicorpsdk`), pkgs.Pkgs())
 	funcs, err := a.FindSDKAPIFuncs(pkgs)
 	require.NoError(t, err)
 
@@ -37,7 +37,7 @@ func TestSDKAnalyzerHashicorpNative(t *testing.T) {
 	pkgs, _, err := loadPackages("./internal/testmodule/hashicorpsdkuser/native", nil, []string{"."})
 	require.NoError(t, err)
 
-	a := NewSDKAnalyzerHashicorp(regexp.MustCompile(`github.com/magodo/aztfp/internal/testmodule/hashicorpsdk`), pkgs.Pkgs())
+	a := NewSDKAnalyzerHashicorp(regexp.MustCompile(`github.com/magodo/aztfo/internal/testmodule/hashicorpsdk`), pkgs.Pkgs())
 	funcs, err := a.FindSDKAPIFuncs(pkgs)
 	require.NoError(t, err)
 

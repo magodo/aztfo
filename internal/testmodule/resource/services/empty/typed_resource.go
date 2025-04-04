@@ -3,7 +3,7 @@ package empty
 import (
 	"context"
 
-	"github.com/magodo/aztfp/internal/testmodule/resource/sdk"
+	"github.com/magodo/aztfo/internal/testmodule/resource/sdk"
 )
 
 var _ sdk.Resource = TypedResource{}

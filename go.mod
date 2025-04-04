@@ -1,4 +1,4 @@
-module github.com/magodo/aztfp
+module github.com/magodo/aztfo
 
 go 1.24.0
 
