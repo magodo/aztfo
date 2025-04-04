@@ -68,4 +68,9 @@ The output data contains each resource or data source supported by the provider,
 ]
 ```
 
-As shown above, each element represents a single resource or data source, which then contains the supported verbs for this Terraform resource, i.e. `create`, `read`, `update`, `delete`. For each verb, it records all the *potential* ARM operations can be invoked during the process, including their http verb, api version and api path. Especially, it has an additional field `is_lro`, indicating if this operation is an [Azure Long Running Operation](https://github.com/Azure/azure-resource-manager-rpc/blob/master/v1.0/async-api-reference.md), as in which case, there can be one more ARM operation involved. The tool can't detect the exact ARM operation needed for each LRO via static code analysis, as the exact URL is returned in runtime (from the response).
+As shown above, each element represents a single resource or data source, which then contains the supported verbs for this Terraform resource, i.e. `create`, `read`, `update`, `delete`. For each verb, it records all the *potential* ARM operations can be invoked during the process, including their http verb, api version and api path. Especially, it has an additional field `is_lro`, indicating if this operation is an [Azure Long Running Operation](https://github.com/Azure/azure-resource-manager-rpc/blob/master/v1.0/async-api-reference.md), as in which case, there can be one more ARM operation involved for polling. The tool can't detect the exact ARM operation needed for each LRO via static code analysis, as the exact URL is returned in runtime (from the response).
+
+## LIMITATION
+
+- [Azure Long Running Operation](https://github.com/Azure/azure-resource-manager-rpc/blob/master/v1.0/async-api-reference.md) polling operation is only surfaced, but no operation detail provided.
+- Only Azure management plane operations are detected, no data plane operation is detected.
