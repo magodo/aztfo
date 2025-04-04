@@ -90,9 +90,17 @@ Options:`)
 			if !resId.IsDataSource {
 				if f := funcs.C; f != nil {
 					result.Create = resReachSDK(graph, funcs.C, sdkFunctions)
+					// Union the read functions as create will always call the read at the end.
+					// This is not necessary for untyped sdk as the read is called explicitly,
+					// while it is necessary for the typed sdk, as the read is implicitly called via the framework.
+					result.Create.Union(result.Read)
 				}
 				if f := funcs.U; f != nil {
+					// Union the read functions as update will always call the read at the end.
+					// This is not necessary for untyped sdk as the read is called explicitly,
+					// while it is necessary for the typed sdk, as the read is implicitly called via the framework.
 					result.Update = resReachSDK(graph, funcs.U, sdkFunctions)
+					result.Update.Union(result.Read)
 				}
 				if f := funcs.D; f != nil {
 					result.Delete = resReachSDK(graph, funcs.D, sdkFunctions)

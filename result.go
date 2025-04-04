@@ -15,9 +15,9 @@ func (r Results) Swap(i int, j int) {
 }
 
 type Result struct {
-	Id     ResourceId     `json:"id"`
-	Create []APIOperation `json:"create,omitempty"`
-	Read   []APIOperation `json:"read,omitempty"`
-	Update []APIOperation `json:"update,omitempty"`
-	Delete []APIOperation `json:"delete,omitempty"`
+	Id     ResourceId    `json:"id"`
+	Create APIOperations `json:"create,omitempty"`
+	Read   APIOperations `json:"read,omitempty"`
+	Update APIOperations `json:"update,omitempty"`
+	Delete APIOperations `json:"delete,omitempty"`
 }

@@ -7,6 +7,7 @@ import (
 	"log"
 	"maps"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/magodo/aztfo/typeutils"
@@ -47,6 +48,14 @@ func (a APIOperations) Less(i int, j int) bool {
 		return x.IsLRO
 	}
 	return true
+}
+
+func (a *APIOperations) Union(b APIOperations) {
+	for _, op := range b {
+		if !slices.Contains(*a, op) {
+			*a = append(*a, op)
+		}
+	}
 }
 
 func (a APIOperations) Swap(i int, j int) {
