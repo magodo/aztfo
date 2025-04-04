@@ -8,6 +8,8 @@ Note that the *potential* ARM operations are supposed to be *complete*. Given a 
 
 Simply run the tool under the root of the terraform-provider-azurerm repo. The output data is printed to the stdout.
 
+The reports for each `terraform-provider-azurerm` release has been generated and hosted at [https://github.com/magodo/aztfo/wiki](https://github.com/magodo/aztfo/wiki). You can simply consume them from there.
+
 ## Output
 
 The output data contains each resource or data source supported by the provider, in the following form:
