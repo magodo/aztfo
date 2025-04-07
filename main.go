@@ -44,6 +44,7 @@ Options:`)
 		"github.com/hashicorp/terraform-provider-azurerm",
 		"github.com/hashicorp/go-azure-sdk",
 		"github.com/Azure/azure-sdk-for-go",
+		"github.com/jackofallops/kermit",
 	}
 	pkgs, graph, err := loadPackages(*flagDir, pkgPathPrefixes, patterns)
 	if err != nil {
