@@ -76,3 +76,4 @@ As shown above, each element represents a single resource or data source, which 
 
 - [Azure Long Running Operation](https://github.com/Azure/azure-resource-manager-rpc/blob/master/v1.0/async-api-reference.md) polling operation is only surfaced, but no operation detail provided.
 - Only Azure management plane operations are detected, no data plane operation is detected.
+- Only static calls are followed, any dynamic calls will not be recognized. This makes the result useful (instead of over-estimated too much) in the most of the cases, except in some limited resource's implementations, it has dynamic calls (e.g. storage account has some of its clients to be an interface), which are not correctly recognised.
