@@ -53,11 +53,19 @@ func (a *SDKAnalyzerHashicorp) FindSDKAPIFuncs(pkgs Packages) (map[*ssa.Function
 
 	res := map[*ssa.Function]APIOperation{}
 	for method := range usedSdkMethods {
+		isAutoRestImported := func(imports []*ast.ImportSpec) bool {
+			for _, ipt := range imports {
+				if ipt.Path.Value == `"github.com/Azure/go-autorest/autorest"` {
+					return true
+				}
+			}
+			return false
+		}
 		var (
 			apiOp *APIOperation
 			err   error
 		)
-		if strings.HasSuffix(method.Pkg.Fset.Position(method.File.Pos()).Filename, "autorest.go") {
+		if isAutoRestImported(method.File.Imports) {
 			apiOp, err = a.findSDKOperationForMethodAutoRest(method)
 			if err != nil {
 				return nil, fmt.Errorf("failed to find SDK operation (autorest) for method %s.%s: %v", method.Recv.Obj().Id(), method.MethodName, err)
@@ -182,27 +190,31 @@ func (a *SDKAnalyzerHashicorp) findSDKOperationForMethodAutoRest(method SDKMetho
 					switch fun.Sel.Name {
 					case "WithPathParameters",
 						"WithPath":
-						firstArgCallExpr, ok := callexpr.Args[0].(*ast.CallExpr)
-						if !ok {
-							continue
-						}
-						sel, ok := firstArgCallExpr.Fun.(*ast.SelectorExpr)
-						if !ok {
-							continue
-						}
-						switch sel.X.(*ast.Ident).Name {
-						// Call the id.ID() to construct the api path
-						case "id":
-							apiPath, ok = a.apiPathFromID(method.Pkg, sel)
-							// Call the fmt.Sprintf() to construct the api path
-						case "fmt":
-							// e.g. '"%s/eventhubs/"'
-							formatString, _ := strconv.Unquote(firstArgCallExpr.Args[0].(*ast.BasicLit).Value)
-							sel := firstArgCallExpr.Args[1].(*ast.CallExpr).Fun.(*ast.SelectorExpr)
-							apiPath, ok = a.apiPathFromID(method.Pkg, sel)
-							apiPath = normalizeAPIPath(fmt.Sprintf(formatString, apiPath))
+						arg := callexpr.Args[0]
+						switch arg := arg.(type) {
+						case *ast.CallExpr:
+							sel, ok := arg.Fun.(*ast.SelectorExpr)
+							if !ok {
+								continue
+							}
+							switch sel.X.(*ast.Ident).Name {
+							case "id":
+								// Call the id.ID() to construct the api path
+								apiPath, ok = a.apiPathFromID(method.Pkg, sel)
+							case "fmt":
+								// Call the fmt.Sprintf() to construct the api path
+								// e.g. '"%s/eventhubs/"'
+								formatString, _ := strconv.Unquote(arg.Args[0].(*ast.BasicLit).Value)
+								sel := arg.Args[1].(*ast.CallExpr).Fun.(*ast.SelectorExpr)
+								apiPath, ok = a.apiPathFromID(method.Pkg, sel)
+								apiPath = normalizeAPIPath(fmt.Sprintf(formatString, apiPath))
+							default:
+								panic(fmt.Sprintf("unexpected WithPath/WithPathParameters call happened at %s", method.Pkg.Fset.Position(callexpr.Pos())))
+							}
+						case *ast.BasicLit:
+							apiPath, _ = strconv.Unquote(arg.Value)
 						default:
-							panic(fmt.Sprintf("unexpected WithPath/WithPathParameters call happened at %s", method.Pkg.Fset.Position(callexpr.Pos())))
+							continue
 						}
 					case "AsGet":
 						opKind = OperationKindGet

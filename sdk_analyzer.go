@@ -70,7 +70,9 @@ type APIOperation struct {
 }
 
 type SDKMethod struct {
-	Pkg        *packages.Package
+	// The package that has the receiver (client) defined
+	Pkg *packages.Package
+	// The file that has the receiver (client) defined
 	File       *ast.File
 	Recv       *types.Named
 	MethodName string
