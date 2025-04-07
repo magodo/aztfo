@@ -213,6 +213,7 @@ func (a *SDKAnalyzerHashicorp) findSDKOperationForMethodAutoRest(method SDKMetho
 							}
 						case *ast.BasicLit:
 							apiPath, _ = strconv.Unquote(arg.Value)
+							apiPath = normalizeAPIPath(apiPath)
 						default:
 							continue
 						}
