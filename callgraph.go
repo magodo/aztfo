@@ -11,50 +11,69 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-// This is the same as the static.CallGraph, except adding the anonymous functions to the graph (as source nodes).
-func CallGraph(prog *ssa.Program) *callgraph.Graph {
-	cg := callgraph.New(nil)
+type SSAVisitor struct {
+	cg *callgraph.Graph
 
-	// Recursively follow all static calls.
-	seen := make(map[int]bool) // node IDs already seen
+	seen map[int]bool
+	// Keep track of the most recent callsite
+	site ssa.CallInstruction
+}
 
-	var visitAnon func(fnode *callgraph.Node)
-	var visit func(fnode *callgraph.Node)
+func (v *SSAVisitor) visit(fnode *callgraph.Node) {
+	if !v.seen[fnode.ID] {
+		v.seen[fnode.ID] = true
 
-	visitAnon = func(fnode *callgraph.Node) {
-		// Anonymous functions can't be called as a static callee, i.e., it can onyl be a source node.
-		// Hence no need to record seen nodes.
-		for _, af := range fnode.Func.AnonFuncs {
-			anode := cg.CreateNode(af)
-			visit(anode)
-		}
-	}
-
-	visit = func(fnode *callgraph.Node) {
-		if !seen[fnode.ID] {
-			seen[fnode.ID] = true
-
-			for _, b := range fnode.Func.Blocks {
-				for _, instr := range b.Instrs {
-					if site, ok := instr.(ssa.CallInstruction); ok {
-						if g := site.Common().StaticCallee(); g != nil {
-							gnode := cg.CreateNode(g)
-							callgraph.AddEdge(fnode, site, gnode)
-							visit(gnode)
-						}
+		for _, b := range fnode.Func.Blocks {
+			for _, instr := range b.Instrs {
+				if site, ok := instr.(ssa.CallInstruction); ok {
+					if g := site.Common().StaticCallee(); g != nil {
+						gnode := v.cg.CreateNode(g)
+						callgraph.AddEdge(fnode, site, gnode)
+						vv := v.withSite(site)
+						vv.visit(gnode)
 					}
+
 				}
 			}
-
-			visitAnon(fnode)
 		}
+
+		// Extending the nodes to include anonymous functions by assuming the anonymous function is also called by the same site.
+		for _, af := range fnode.Func.AnonFuncs {
+			if af == nil {
+				panic("af == nil")
+			}
+			gnode := v.cg.CreateNode(af)
+			if gnode == nil {
+				panic("gnode == nil")
+			}
+			callgraph.AddEdge(fnode, v.site, gnode)
+			v.visit(gnode)
+		}
+
+	}
+}
+
+func (v SSAVisitor) withSite(site ssa.CallInstruction) SSAVisitor {
+	return SSAVisitor{
+		cg:   v.cg,
+		seen: v.seen,
+		site: site,
+	}
+}
+
+// This is the same as the static.CallGraph, except adding the anonymous functions to the graph (as source nodes).
+func CallGraph(prog *ssa.Program) *callgraph.Graph {
+	v := SSAVisitor{
+		cg:   callgraph.New(nil),
+		seen: make(map[int]bool), // node IDs already seen,
+		site: nil,
 	}
 
 	methodsOf := func(T types.Type) {
 		if !types.IsInterface(T) {
 			mset := prog.MethodSets.MethodSet(T)
 			for i := 0; i < mset.Len(); i++ {
-				visit(cg.CreateNode(prog.MethodValue(mset.At(i))))
+				v.visit(v.cg.CreateNode(prog.MethodValue(mset.At(i))))
 			}
 		}
 	}
@@ -65,7 +84,7 @@ func CallGraph(prog *ssa.Program) *callgraph.Graph {
 			switch mem := mem.(type) {
 			case *ssa.Function:
 				// package-level function
-				visit(cg.CreateNode(mem))
+				v.visit(v.cg.CreateNode(mem))
 
 			case *ssa.Type:
 				// methods of package-level non-interface non-parameterized types
@@ -80,7 +99,7 @@ func CallGraph(prog *ssa.Program) *callgraph.Graph {
 		}
 	}
 
-	return cg
+	return v.cg
 }
 
 func trimCallGraph(graph *callgraph.Graph, pkgPathPrefixes []string) {
