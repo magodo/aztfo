@@ -63,6 +63,12 @@ The output data contains each resource or data source supported by the provider,
         "version": "2020-06-01",
         "path": "/SUBSCRIPTIONS/{}/RESOURCEGROUPS/{}",
         "is_lro": true
+      },
+      {
+        "kind": "GET",
+        "version": "2020-06-01",
+        "path": "/SUBSCRIPTIONS/{}/RESOURCEGROUPS/{}/RESOURCES",
+        "is_lro": false
       }
     ]
   },
