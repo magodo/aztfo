@@ -61,4 +61,4 @@ jobs:
           git config user.email "wztwcy@gmail.com"
           git add .
           git commit -m "Support ${tag}"
-          git push
+          git push https://${{ secrets.GITHUB_PAT }}@github.com/magodo/aztfo.wiki.git
