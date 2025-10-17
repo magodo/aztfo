@@ -27,6 +27,7 @@ jobs:
       - name: Test
         run: |
           cd aztfo.wiki
+          echo $PAT | sha256sum
           git switch -c from_pipeline
           git config --global user.name "magodo"
           git config --global user.email "wztwcy@gmail.com"
