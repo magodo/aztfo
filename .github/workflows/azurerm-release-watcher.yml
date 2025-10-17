@@ -1,0 +1,63 @@
+name: Watch terraform-provider-azurerm releases
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Runs every day at 00:00 UTC
+  workflow_dispatch:    # allow manual trigger too
+
+jobs:
+  watch-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get latest release tag
+        id: get_release
+        run: |
+          latest=$(curl -s https://api.github.com/repos/hashicorp/terraform-provider-azurerm/releases/latest | jq -r .tag_name)
+          echo "latest=$latest" >> $GITHUB_OUTPUT
+
+      - name: Checkout aztfo.wiki
+        uses: actions/checkout@v5
+        with:
+          repository: 'magodo/aztfo.wiki'
+          path: 'aztfo.wiki'
+
+      - name: Version existance check
+        id: check_version
+        run: |
+          if grep -q "${{ steps.get_release.outputs.latest }}" aztfo.wiki/Home.md; then
+            echo "Version already exists, exit..."
+            exit 0
+          fi
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+
+      - name: Install aztfo
+        run: |
+          go install github.com/magodo/aztfo@latest
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+
+      - name: Checkout terraform-provider-azurerm
+        uses: actions/checkout@v5
+        with:
+          repository: 'hashicorp/terraform-provider-azurerm'
+          ref: "${{ steps.get_release.outputs.latest }}"
+          path: 'terraform-provider-azurerm'
+
+      - name: Run aztfo
+        run: |
+          tag="${{ steps.get_release.outputs.latest }}"
+
+          aztfo -debug -chdir terraform-provider-azurerm > aztfo.wiki/reports/${tag}.json
+          echo "- [${tag}.json](reports/${tag}.json)" >> aztfo.wiki/Home.md
+
+          cd aztfo.wiki
+          git config --global user.name "magodo"
+          git config --global user.email "wztwcy@gmail.com"
+          git add .
+          git commit -m "Support ${tag}"
+          git push "https://${PAT}@github.com/magodo/aztfo.wiki.git"
+        env:
+          PAT: ${{ secrets.PAT }}
