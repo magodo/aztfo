@@ -62,5 +62,5 @@ jobs:
           git add .
           git commit -m "Support ${tag}"
           git push https://${PAT}@github.com/magodo/aztfo.wiki
-        with:
+        env:
           PAT: ${{ secrets.PAT }}
