@@ -24,18 +24,6 @@ jobs:
           repository: 'magodo/aztfo.wiki'
           path: 'aztfo.wiki'
 
-      - name: Test
-        run: |
-          cd aztfo.wiki
-          echo $PAT | sha256sum
-          git switch -c from_pipeline
-          git config --global user.name "magodo"
-          git config --global user.email "wztwcy@gmail.com"
-          git commit --allow-empty -m 'test'
-          git push "https://${PAT}@github.com/magodo/aztfo.wiki.git"
-        env:
-          PAT: ${{ secrets.PAT }}
-
       - name: Version existance check
         id: check_version
         run: |
