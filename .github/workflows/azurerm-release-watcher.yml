@@ -26,7 +26,7 @@ jobs:
         run: |
           if grep -q "${{ steps.get_release.outputs.latest }}" aztfo.wiki/Home.md; then
             echo "Version already exists, exit..."
-            exit 0
+            exit 1
           fi
 
       - name: Setup Go
