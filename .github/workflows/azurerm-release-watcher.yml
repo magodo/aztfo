@@ -24,6 +24,15 @@ jobs:
           repository: 'magodo/aztfo.wiki'
           path: 'aztfo.wiki'
 
+      - name: Test
+        run: |
+          cd aztfo.wiki
+          git switch -c from_pipeline
+          git commit --allow-empty -m 'test'
+          git push "https://${PAT}@github.com/magodo/aztfo.wiki.git"
+        env:
+          PAT: ${{ secrets.PAT }}
+
       - name: Version existance check
         id: check_version
         run: |
@@ -57,8 +66,6 @@ jobs:
           echo "- [${tag}.json](reports/${tag}.json)" >> aztfo.wiki/Home.md
 
           cd aztfo.wiki
-          git config user.name "magodo"
-          git config user.email "wztwcy@gmail.com"
           git add .
           git commit -m "Support ${tag}"
           git push "https://${PAT}@github.com/magodo/aztfo.wiki.git"
