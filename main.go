@@ -9,12 +9,14 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
+	"strings"
 
 	"github.com/magodo/workerpool"
 )
 
 func main() {
 	flagDir := flag.String("chdir", ".", "terraform-provider-azurerm root directory")
+	flagResources := flag.String("resources", "", `A comma separated resource types to analyze. For data source, add the prefix "data.".`)
 	flagDebug := flag.Bool("debug", false, "Enable debug log")
 	flag.Usage = func() {
 		fmt.Println(`Usage: aztfo [options] <packages>
@@ -59,9 +61,26 @@ Options:`)
 			servicePkgs = append(servicePkgs, pkg)
 		}
 	}
+
 	resources, err := findResources(servicePkgs)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if *flagResources != "" {
+		filteredResources := ResourceInfos{}
+		for res := range strings.SplitSeq(*flagResources, ",") {
+			targetResId := ResourceId{
+				Name:         strings.TrimPrefix(res, "data."),
+				IsDataSource: strings.HasPrefix(res, "data."),
+			}
+			info, ok := resources[targetResId]
+			if !ok {
+				log.Printf("WARNING: resource type %q not found\n", res)
+				continue
+			}
+			filteredResources[targetResId] = info
+		}
+		resources = filteredResources
 	}
 
 	// Find sdk functions
