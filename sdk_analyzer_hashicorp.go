@@ -98,6 +98,7 @@ func (a *SDKAnalyzerHashicorp) findSDKOperationForMethodAutoRest(method SDKMetho
 	methodName := method.MethodName
 	if strings.HasSuffix(methodName, "ThenPoll") {
 		// PUT/DELETE
+		methodName = strings.TrimSuffix(methodName, "CallbackThenPoll")
 		methodName = strings.TrimSuffix(methodName, "ThenPoll")
 		isLRO = true
 	} else if strings.HasSuffix(methodName, "CompleteMatchingPredicate") {
