@@ -1,6 +1,6 @@
 module github.com/magodo/aztfo
 
-go 1.24.0
+go 1.26
 
 require (
 	github.com/hashicorp/go-multierror v1.1.1
